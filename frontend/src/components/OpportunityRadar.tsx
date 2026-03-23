@@ -1,21 +1,45 @@
+"use client";
+
+import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { ArrowUpRight, Sparkles } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { intelligenceEvents } from "@/data/intelligence";
+import { analyzeEvent, fetchLiveNews } from "@/utils/api.js";
 
 interface OpportunityRadarProps {
   selectedEventId: string;
   onSelectEvent: (eventId: string) => void;
-  onContinue: () => void;
 }
 
-const importanceClasses = {
-  High: "border-primary/30 bg-primary/10 text-foreground",
-  Elevated: "border-accent/30 bg-accent/10 text-foreground",
-  Watch: "border-border/50 bg-secondary/60 text-text-secondary",
-};
+const OpportunityRadar = ({ selectedEventId, onSelectEvent }: OpportunityRadarProps) => {
+  const [newsArticles, setNewsArticles] = useState<any[]>([]);
+  const [selectedArticle, setSelectedArticle] = useState<any | null>(null);
+  const [eventAnalysis, setEventAnalysis] = useState<any | null>(null);
+  const [isLoadingNews, setIsLoadingNews] = useState(false);
+  const [isLoadingAnalysis, setIsLoadingAnalysis] = useState(false);
 
-const OpportunityRadar = ({ selectedEventId, onSelectEvent, onContinue }: OpportunityRadarProps) => {
+  useEffect(() => {
+    const loadNews = async () => {
+      setIsLoadingNews(true);
+      const latestNews = await fetchLiveNews();
+      setNewsArticles(Array.isArray(latestNews) ? latestNews : []);
+      setIsLoadingNews(false);
+    };
+
+    loadNews();
+  }, []);
+
+  const handleArticleClick = async (article: any) => {
+    setSelectedArticle(article);
+    onSelectEvent(article?.id ?? article?.title ?? selectedEventId);
+    setIsLoadingAnalysis(true);
+
+    const result = await analyzeEvent(article?.title ?? "", article?.description ?? "");
+    setEventAnalysis(result);
+    localStorage.setItem("et_edge_event_analysis", JSON.stringify(result));
+    setIsLoadingAnalysis(false);
+  };
+
   return (
     <section className="relative min-h-screen overflow-hidden px-6 py-24 md:px-10 lg:px-16">
       <div className="absolute inset-0 gradient-event" />
@@ -75,72 +99,97 @@ const OpportunityRadar = ({ selectedEventId, onSelectEvent, onContinue }: Opport
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-xs uppercase tracking-[0.28em] text-text-secondary">Story flow</p>
-                <p className="mt-2 text-lg text-foreground">Event → Explanation → Impact → Validation → Exploration</p>
+                <p className="mt-2 text-lg text-foreground">
+                  {isLoadingAnalysis
+                    ? "Analysing event..."
+                    : eventAnalysis
+                      ? (selectedArticle?.title ?? "Selected event")
+                      : "Select a news headline to see AI analysis."}
+                </p>
               </div>
               <Sparkles className="text-accent" size={18} />
             </div>
-            <div className="mt-6 grid gap-3 text-sm text-text-secondary md:grid-cols-2">
-              <div className="rounded-2xl border border-border/30 bg-secondary/30 p-4">Reasoning-first signals, not disconnected widgets.</div>
-              <div className="rounded-2xl border border-border/30 bg-secondary/30 p-4">Every event can pull you deeper into explainability and personal impact.</div>
+            <div className="mt-6 grid gap-3 text-sm text-text-secondary">
+              {isLoadingAnalysis ? (
+                <div className="rounded-2xl border border-border/30 bg-secondary/30 p-4">Analysing event...</div>
+              ) : eventAnalysis ? (
+                <>
+                  <div className="rounded-2xl border border-border/30 bg-secondary/30 p-4">
+                    <span className="text-foreground">What happened: </span>
+                    {eventAnalysis.whatHappened}
+                  </div>
+                  <div className="rounded-2xl border border-border/30 bg-secondary/30 p-4">
+                    <span className="text-foreground">Why it matters: </span>
+                    {eventAnalysis.whyItMatters}
+                  </div>
+                  <div className="rounded-2xl border border-border/30 bg-secondary/30 p-4">
+                    <span className="text-foreground">Affected sectors: </span>
+                    {Array.isArray(eventAnalysis.affectedSectors) ? eventAnalysis.affectedSectors.join(", ") : ""}
+                  </div>
+                  <div className="rounded-2xl border border-border/30 bg-secondary/30 p-4">
+                    <span className="text-foreground">Affected stocks: </span>
+                    {Array.isArray(eventAnalysis.affectedStocks) ? eventAnalysis.affectedStocks.join(", ") : ""}
+                  </div>
+                  <div className="rounded-2xl border border-border/30 bg-secondary/30 p-4">
+                    <span className="text-foreground">Confidence score: </span>
+                    {eventAnalysis.confidenceScore != null ? `${eventAnalysis.confidenceScore}%` : ""}
+                  </div>
+                </>
+              ) : (
+                <div className="rounded-2xl border border-border/30 bg-secondary/30 p-4">Select a news headline to see AI analysis.</div>
+              )}
             </div>
           </motion.div>
         </motion.div>
 
         <div className="grid gap-6 lg:grid-cols-2 xl:grid-cols-4">
-          {intelligenceEvents.map((event, index) => {
-            const isSelected = event.id === selectedEventId;
+          {isLoadingNews ? (
+            <div className="glass rounded-[2rem] border border-border/30 p-6 text-left">Loading latest market news...</div>
+          ) : (
+            newsArticles.map((event: any, index: number) => {
+              const isSelected = (event?.id ?? event?.title) === selectedEventId;
 
-            return (
-              <motion.button
-                key={event.id}
-                type="button"
-                initial={{ opacity: 0, y: 36, filter: "blur(10px)" }}
-                animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
-                transition={{ duration: 0.85, delay: index * 0.08, ease: [0.16, 1, 0.3, 1] }}
-                whileHover={{ scale: 1.03, y: -8, rotateX: 2, rotateY: -2 }}
-                whileTap={{ scale: 0.985 }}
-                onClick={() => {
-                  onSelectEvent(event.id);
-                  onContinue();
-                }}
-                className={`card-3d group relative overflow-hidden rounded-[2rem] border p-6 text-left transition-all duration-500 ${
-                  isSelected
-                    ? "glass-strong border-primary/30 glow-soft-violet"
-                    : "glass border-border/30 hover:border-accent/20 hover:glow-soft-cyan"
-                }`}
-              >
-                <div className="absolute inset-x-6 top-0 h-px bg-gradient-to-r from-transparent via-accent/60 to-transparent opacity-70" />
-                <div className="flex items-start justify-between gap-4">
-                  <div className="space-y-3">
-                    <Badge variant="outline" className={`rounded-full px-3 py-1 text-[0.65rem] uppercase tracking-[0.2em] ${importanceClasses[event.importance]}`}>
-                      {event.type}
-                    </Badge>
-                    <h2 className="font-display text-2xl leading-tight text-foreground">{event.title}</h2>
+              return (
+                <motion.button
+                  key={event?.id ?? `${event?.title}-${index}`}
+                  type="button"
+                  initial={{ opacity: 0, y: 36, filter: "blur(10px)" }}
+                  animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+                  transition={{ duration: 0.85, delay: index * 0.08, ease: [0.16, 1, 0.3, 1] }}
+                  whileHover={{ scale: 1.03, y: -8, rotateX: 2, rotateY: -2 }}
+                  whileTap={{ scale: 0.985 }}
+                  onClick={() => handleArticleClick(event)}
+                  className={`card-3d group relative overflow-hidden rounded-[2rem] border p-6 text-left transition-all duration-500 ${
+                    isSelected
+                      ? "glass-strong border-primary/30 glow-soft-violet"
+                      : "glass border-border/30 hover:border-accent/20 hover:glow-soft-cyan"
+                  }`}
+                >
+                  <div className="absolute inset-x-6 top-0 h-px bg-gradient-to-r from-transparent via-accent/60 to-transparent opacity-70" />
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="space-y-3">
+                      <Badge variant="outline" className="rounded-full px-3 py-1 text-[0.65rem] uppercase tracking-[0.2em] border-border/50 bg-secondary/60 text-text-secondary">
+                        {event?.source ?? "News"}
+                      </Badge>
+                      <h2 className="font-display text-2xl leading-tight text-foreground">{event?.title}</h2>
+                    </div>
+                    <motion.span
+                      className="mt-1 h-3 w-3 rounded-full bg-accent shadow-[0_0_18px_hsl(var(--accent)/0.45)]"
+                      animate={{ scale: [1, 1.25, 1], opacity: [0.65, 1, 0.65] }}
+                      transition={{ duration: 2.4, repeat: Infinity, ease: "easeInOut" }}
+                    />
                   </div>
-                  <motion.span
-                    className="mt-1 h-3 w-3 rounded-full bg-accent shadow-[0_0_18px_hsl(var(--accent)/0.45)]"
-                    animate={{ scale: [1, 1.25, 1], opacity: [0.65, 1, 0.65] }}
-                    transition={{ duration: 2.4, repeat: Infinity, ease: "easeInOut" }}
-                  />
-                </div>
 
-                <p className="mt-5 text-sm leading-7 text-text-secondary">{event.summary}</p>
+                  <p className="mt-5 text-sm leading-7 text-text-secondary">{event?.source}</p>
 
-                <div className="mt-6 flex flex-wrap gap-2">
-                  {event.sectors.map((sector) => (
-                    <Badge key={sector} variant="outline" className="rounded-full border-accent/20 bg-accent/10 px-3 py-1 text-xs text-foreground">
-                      {sector}
-                    </Badge>
-                  ))}
-                </div>
-
-                <div className="mt-7 flex items-center justify-between text-sm text-text-secondary">
-                  <span>Open explainability view</span>
-                  <ArrowUpRight className="transition-transform duration-500 group-hover:-translate-y-1 group-hover:translate-x-1" size={18} />
-                </div>
-              </motion.button>
-            );
-          })}
+                  <div className="mt-7 flex items-center justify-between text-sm text-text-secondary">
+                    <span>Analyze this event</span>
+                    <ArrowUpRight className="transition-transform duration-500 group-hover:-translate-y-1 group-hover:translate-x-1" size={18} />
+                  </div>
+                </motion.button>
+              );
+            })
+          )}
         </div>
       </div>
     </section>

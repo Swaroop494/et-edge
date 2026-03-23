@@ -1,3 +1,5 @@
+"use client";
+
 import FinfluencerDetector from "@/components/FinfluencerDetector";
 
 const FinfluencerPage = () => {

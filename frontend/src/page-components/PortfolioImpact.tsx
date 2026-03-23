@@ -1,3 +1,5 @@
+"use client";
+
 import MarketChat from "@/components/MarketChat";
 
 const PortfolioImpact = () => {

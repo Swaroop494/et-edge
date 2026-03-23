@@ -1,11 +1,13 @@
-import { useMemo, useState } from "react";
+"use client";
+
+import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { z } from "zod";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
-import { intelligenceEvents } from "@/data/intelligence";
+import { portfolioImpact } from "@/utils/api.js";
 
 interface MarketChatProps {
   eventId: string;
@@ -25,53 +27,54 @@ const riskStyles = {
 };
 
 const MarketChat = ({ eventId }: MarketChatProps) => {
-  const event = intelligenceEvents.find((item) => item.id === eventId) ?? intelligenceEvents[0];
-  const [portfolioInput, setPortfolioInput] = useState("HDFCBANK, SBIN, DLF");
-  const [error, setError] = useState("");
-  const [submittedHoldings, setSubmittedHoldings] = useState<string[]>(["HDFCBANK", "SBIN", "DLF"]);
+  const [holdingsInput, setHoldingsInput] = useState("");
+  const [impactResult, setImpactResult] = useState<any | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [currentEventAnalysis, setCurrentEventAnalysis] = useState<any | null>(null);
 
-  const result = useMemo(() => {
-    const impacted = submittedHoldings.filter((holding) => event.affectedStocks.includes(holding));
-    const exposure = submittedHoldings.length ? Math.round((impacted.length / submittedHoldings.length) * 100) : 0;
-
-    const riskLabel = exposure >= 60 || (event.confidence >= 80 && impacted.length >= 2)
-      ? "High"
-      : exposure >= 25 || impacted.length > 0
-        ? "Medium"
-        : "Low";
-
-    return {
-      impacted,
-      exposure,
-      riskLabel,
-      safeCount: Math.max(submittedHoldings.length - impacted.length, 0),
-    } as const;
-  }, [event, submittedHoldings]);
+  useEffect(() => {
+    const storedAnalysis = localStorage.getItem("et_edge_event_analysis");
+    if (storedAnalysis) {
+      try {
+        setCurrentEventAnalysis(JSON.parse(storedAnalysis));
+      } catch (parseError) {
+        console.error("Failed to parse stored event analysis:", parseError);
+      }
+    }
+  }, []);
 
   const handleSimulate = () => {
-    const parsed = portfolioSchema.safeParse(portfolioInput);
+    const runImpact = async () => {
+      const parsed = portfolioSchema.safeParse(holdingsInput);
 
     if (!parsed.success) {
-      setError(parsed.error.issues[0]?.message ?? "Please review the portfolio input.");
+        setError(parsed.error.issues[0]?.message ?? "Please review the portfolio input.");
       return;
     }
 
-    const holdings = Array.from(
-      new Set(
-        parsed.data
-          .split(",")
-          .map((item) => item.trim().toUpperCase())
-          .filter(Boolean),
-      ),
-    );
+      const userHoldings = parsed.data
+        .split(",")
+        .map((item) => item.trim())
+        .filter(Boolean);
 
-    if (!holdings.length) {
-      setError("Add at least one stock ticker.");
-      return;
-    }
+      if (!currentEventAnalysis) {
+        alert("Please select a news event first on the Events page");
+        return;
+      }
 
-    setError("");
-    setSubmittedHoldings(holdings);
+      setIsLoading(true);
+      setError(null);
+
+      const result = await portfolioImpact(userHoldings, currentEventAnalysis);
+      setImpactResult(result);
+      if (!result) {
+        setError("Unable to analyse portfolio impact. Please try again.");
+      }
+      setIsLoading(false);
+    };
+
+    runImpact();
   };
 
   return (
@@ -113,22 +116,22 @@ const MarketChat = ({ eventId }: MarketChatProps) => {
             <p className="text-xs uppercase tracking-[0.28em] text-text-secondary">Portfolio input</p>
             <div className="mt-5 space-y-4">
               <Input
-                value={portfolioInput}
-                onChange={(event) => setPortfolioInput(event.target.value)}
+                value={holdingsInput}
+                onChange={(event) => setHoldingsInput(event.target.value)}
                 placeholder="HDFCBANK, SBIN, DLF"
                 className="h-12 rounded-2xl border-border/30 bg-secondary/30 text-foreground placeholder:text-text-secondary/60 focus-visible:ring-primary/40"
               />
-              <p className="text-sm leading-7 text-text-secondary">Current event in focus: <span className="text-foreground">{event.title}</span></p>
+              <p className="text-sm leading-7 text-text-secondary">Current event in focus: <span className="text-foreground">{currentEventAnalysis?.whatHappened ?? "No event selected yet"}</span></p>
               {error ? <p className="text-sm text-critical">{error}</p> : null}
               <Button onClick={handleSimulate} className="h-12 rounded-2xl px-6">
-                Simulate impact
+                {isLoading ? "Analysing..." : "Simulate impact"}
               </Button>
             </div>
           </motion.div>
 
           <AnimatePresence mode="wait">
             <motion.div
-              key={`${event.id}-${submittedHoldings.join("-")}`}
+              key={`${eventId}-${holdingsInput}`}
               initial={{ opacity: 0, y: 24, filter: "blur(10px)" }}
               animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
               exit={{ opacity: 0, y: -16, filter: "blur(8px)" }}
@@ -138,46 +141,57 @@ const MarketChat = ({ eventId }: MarketChatProps) => {
               <div className="flex flex-col gap-5 md:flex-row md:items-start md:justify-between">
                 <div>
                   <p className="text-xs uppercase tracking-[0.28em] text-text-secondary">Exposure</p>
-                  <h3 className="mt-3 font-display text-4xl text-foreground">{result.exposure}%</h3>
+                  <h3 className="mt-3 font-display text-4xl text-foreground">{impactResult?.riskScore ?? 0}%</h3>
                 </div>
-                <Badge variant="outline" className={`rounded-full px-4 py-1 text-xs ${riskStyles[result.riskLabel]}`}>
-                  {result.riskLabel} risk
+                <Badge
+                  variant="outline"
+                  className={`rounded-full px-4 py-1 text-xs ${
+                    impactResult?.overallVerdict === "Low"
+                      ? riskStyles.Low
+                      : impactResult?.overallVerdict === "Medium"
+                        ? riskStyles.Medium
+                        : riskStyles.High
+                  }`}
+                >
+                  {impactResult?.overallVerdict ?? "High"} risk
                 </Badge>
               </div>
 
               <div className="mt-6">
-                <Progress value={result.exposure} className="h-3 bg-secondary/70" />
+                <Progress value={impactResult?.riskScore ?? 0} className="h-3 bg-secondary/70" />
               </div>
 
               <div className="mt-8 grid gap-4 md:grid-cols-3">
                 <div className="rounded-[1.5rem] border border-border/30 bg-secondary/30 p-5">
                   <p className="text-xs uppercase tracking-[0.24em] text-text-secondary">Affected stocks</p>
-                  <p className="mt-3 font-display text-3xl text-foreground">{result.impacted.length}</p>
+                  <p className="mt-3 font-display text-3xl text-foreground">{impactResult?.stockImpacts?.length ?? 0}</p>
                 </div>
                 <div className="rounded-[1.5rem] border border-border/30 bg-secondary/30 p-5">
                   <p className="text-xs uppercase tracking-[0.24em] text-text-secondary">Relatively safe</p>
-                  <p className="mt-3 font-display text-3xl text-foreground">{result.safeCount}</p>
+                  <p className="mt-3 font-display text-3xl text-foreground">{impactResult?.overallVerdict ?? "-"}</p>
                 </div>
                 <div className="rounded-[1.5rem] border border-border/30 bg-secondary/30 p-5">
                   <p className="text-xs uppercase tracking-[0.24em] text-text-secondary">Decision signal</p>
-                  <p className="mt-3 font-display text-3xl text-foreground">{result.riskLabel === "Low" ? "Steady" : result.riskLabel === "Medium" ? "Review" : "Protect"}</p>
+                  <p className="mt-3 font-display text-3xl text-foreground">
+                    {impactResult?.overallVerdict === "Low" ? "Steady" : impactResult?.overallVerdict === "Medium" ? "Review" : "Protect"}
+                  </p>
                 </div>
               </div>
 
               <div className="mt-8 grid gap-4 lg:grid-cols-[1fr_0.9fr]">
                 <div className="rounded-[1.5rem] border border-border/30 bg-secondary/20 p-5">
                   <p className="text-xs uppercase tracking-[0.24em] text-text-secondary">Names in the event path</p>
-                  <div className="mt-4 flex flex-wrap gap-2">
-                    {result.impacted.length ? result.impacted.map((stock) => (
-                      <Badge key={stock} variant="outline" className="rounded-full border-primary/20 bg-primary/10 px-3 py-1 text-xs text-foreground">
-                        {stock}
-                      </Badge>
-                    )) : <p className="text-sm leading-7 text-text-secondary">No direct ticker overlap detected from the current input.</p>}
+                  <div className="mt-4 grid gap-2">
+                    {impactResult?.stockImpacts?.length ? impactResult.stockImpacts.map((stock: any) => (
+                      <div key={stock.symbol} className="rounded-xl border border-border/30 bg-secondary/20 p-3 text-sm text-foreground">
+                        {stock.symbol} - {stock.impactLevel} - {stock.direction} - {stock.plainEnglishReason}
+                      </div>
+                    )) : <p className="text-sm leading-7 text-text-secondary">No portfolio analysis yet.</p>}
                   </div>
                 </div>
                 <div className="rounded-[1.5rem] border border-border/30 bg-secondary/20 p-5">
                   <p className="text-xs uppercase tracking-[0.24em] text-text-secondary">AI interpretation</p>
-                  <p className="mt-4 text-sm leading-7 text-foreground">{event.portfolioSignal}</p>
+                  <p className="mt-4 text-sm leading-7 text-foreground">{impactResult?.verdictExplanation ?? "Add holdings and simulate impact to see AI interpretation."}</p>
                 </div>
               </div>
             </motion.div>

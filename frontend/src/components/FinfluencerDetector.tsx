@@ -1,11 +1,13 @@
-import { useMemo, useState } from "react";
+"use client";
+
+import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { z } from "zod";
 import { AlertTriangle, ShieldCheck, Siren } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { intelligenceEvents } from "@/data/intelligence";
+import { fetchLiveNews, validateTip } from "@/utils/api.js";
 
 interface FinfluencerDetectorProps {
   eventId: string;
@@ -17,40 +19,6 @@ const verdictStyles = {
   Valid: "border-success/20 bg-success/10 text-foreground",
   Misleading: "border-warning/20 bg-warning/10 text-foreground",
   False: "border-critical/20 bg-critical/10 text-foreground",
-};
-
-const verdictIcons = {
-  Valid: ShieldCheck,
-  Misleading: AlertTriangle,
-  False: Siren,
-};
-
-const analyzeTip = (tip: string, eventTitle: string) => {
-  const normalized = tip.toLowerCase();
-  const hypeSignals = ["guaranteed", "sure shot", "double", "no risk", "insider", "hidden upper circuit"];
-  const hypeCount = hypeSignals.reduce((count, phrase) => count + (normalized.includes(phrase) ? 1 : 0), 0);
-  const eventAware = eventTitle.toLowerCase().split(" ").some((word) => word.length > 4 && normalized.includes(word));
-
-  const score = Math.max(18, Math.min(91, 76 + (eventAware ? 8 : 0) - hypeCount * 22));
-  const verdict = score >= 72 ? "Valid" : score >= 42 ? "Misleading" : "False";
-
-  return {
-    score,
-    verdict: verdict as keyof typeof verdictStyles,
-    reasons: [
-      eventAware
-        ? `The claim references the active market event: ${eventTitle}.`
-        : `The claim is not clearly anchored to the current event context: ${eventTitle}.`,
-      hypeCount > 0
-        ? "Promotional language lowers confidence because it replaces evidence with certainty."
-        : "The wording is relatively measured, which improves credibility.",
-      verdict === "Valid"
-        ? "The logic aligns with observable event transmission and sector impact."
-        : verdict === "Misleading"
-          ? "Parts of the claim may be directionally true, but the confidence is overstated."
-          : "The claim conflicts with explainable event-based reasoning and should not be trusted as-is.",
-    ],
-  };
 };
 
 /* Circular SVG progress ring */
@@ -106,22 +74,37 @@ const CircularScore = ({ score, verdict }: { score: number; verdict: keyof typeo
 };
 
 const FinfluencerDetector = ({ eventId }: FinfluencerDetectorProps) => {
-  const event = intelligenceEvents.find((item) => item.id === eventId) ?? intelligenceEvents[0];
-  const [tipInput, setTipInput] = useState("Sure shot multibagger: RBI rate hike means every bank stock will rally tomorrow.");
-  const [error, setError] = useState("");
-  const [submittedTip, setSubmittedTip] = useState(tipInput);
-
-  const result = useMemo(() => analyzeTip(submittedTip, event.title), [submittedTip, event.title]);
-  const VerdictIcon = verdictIcons[result.verdict];
+  const [tipInput, setTipInput] = useState("");
+  const [validationResult, setValidationResult] = useState<any | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const handleAnalyze = () => {
-    const parsed = tipSchema.safeParse(tipInput);
-    if (!parsed.success) {
-      setError(parsed.error.issues[0]?.message ?? "Please review the tip before analyzing.");
-      return;
-    }
-    setError("");
-    setSubmittedTip(parsed.data);
+    const runValidation = async () => {
+      const parsed = tipSchema.safeParse(tipInput);
+      if (!parsed.success) {
+        setError(parsed.error.issues[0]?.message ?? "Please review the tip before analyzing.");
+        return;
+      }
+
+      setIsLoading(true);
+      setError(null);
+
+      const liveNews = await fetchLiveNews();
+      const formattedHeadlines = (Array.isArray(liveNews) ? liveNews : [])
+        .slice(0, 5)
+        .map((item, index) => `${index + 1}. ${item?.title ?? ""}`)
+        .join(" ");
+
+      const result = await validateTip(parsed.data, formattedHeadlines);
+      setValidationResult(result);
+      if (!result) {
+        setError("Validation failed. Please try again.");
+      }
+      setIsLoading(false);
+    };
+
+    runValidation();
   };
 
   return (
@@ -168,16 +151,16 @@ const FinfluencerDetector = ({ eventId }: FinfluencerDetectorProps) => {
               placeholder="Paste a market claim or finfluencer tip here..."
               className="mt-5 min-h-[180px] rounded-[1.5rem] border-border/30 bg-secondary/30 text-foreground placeholder:text-text-secondary/60 focus-visible:ring-primary/40"
             />
-            <p className="mt-4 text-sm leading-7 text-text-secondary">Current evidence context: <span className="text-foreground">{event.title}</span></p>
+            <p className="mt-4 text-sm leading-7 text-text-secondary">Current evidence context: live market headlines</p>
             {error ? <p className="mt-3 text-sm text-critical">{error}</p> : null}
             <Button onClick={handleAnalyze} className="mt-6 h-12 rounded-2xl px-6">
-              Reveal verdict
+              {isLoading ? "Validating tip..." : "Reveal verdict"}
             </Button>
           </motion.div>
 
           <AnimatePresence mode="wait">
             <motion.div
-              key={`${event.id}-${submittedTip}`}
+              key={tipInput || eventId}
               initial={{ opacity: 0, scale: 0.94, filter: "blur(16px)" }}
               animate={{ opacity: 1, scale: 1, filter: "blur(0px)" }}
               exit={{ opacity: 0, scale: 0.96, filter: "blur(12px)" }}
@@ -186,14 +169,32 @@ const FinfluencerDetector = ({ eventId }: FinfluencerDetectorProps) => {
             >
               <div className="flex items-start justify-between gap-4">
                 <div className="flex items-center gap-6">
-                  <CircularScore score={result.score} verdict={result.verdict} />
+                  <CircularScore
+                    score={validationResult?.validityScore ?? 0}
+                    verdict={
+                      validationResult?.verdict === "Likely True"
+                        ? "Valid"
+                        : validationResult?.verdict === "Misleading"
+                          ? "Misleading"
+                          : "False"
+                    }
+                  />
                   <div>
                     <p className="text-xs uppercase tracking-[0.28em] text-text-secondary">Validation result</p>
                     <span className="text-sm uppercase tracking-[0.24em] text-text-secondary mt-1 block">validity score</span>
                   </div>
                 </div>
-                <Badge variant="outline" className={`rounded-full px-4 py-1 text-xs ${verdictStyles[result.verdict]}`}>
-                  {result.verdict}
+                <Badge
+                  variant="outline"
+                  className={`rounded-full px-4 py-1 text-xs ${
+                    validationResult?.verdict === "Likely True"
+                      ? "border-success/20 bg-success/10 text-foreground"
+                      : validationResult?.verdict === "Misleading"
+                        ? "border-warning/20 bg-warning/10 text-foreground"
+                        : "border-critical/20 bg-critical/10 text-foreground"
+                  }`}
+                >
+                  {validationResult?.verdict ?? "No verdict"}
                 </Badge>
               </div>
 
@@ -205,17 +206,23 @@ const FinfluencerDetector = ({ eventId }: FinfluencerDetectorProps) => {
               >
                 <div className="flex items-center gap-4">
                   <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10 text-primary">
-                    <VerdictIcon size={22} />
+                    {validationResult?.verdict === "Likely True" ? (
+                      <ShieldCheck size={22} />
+                    ) : validationResult?.verdict === "Misleading" ? (
+                      <AlertTriangle size={22} />
+                    ) : (
+                      <Siren size={22} />
+                    )}
                   </div>
                   <div>
                     <p className="text-xs uppercase tracking-[0.24em] text-text-secondary">Verdict</p>
-                    <p className="mt-2 font-display text-3xl text-foreground">{result.verdict}</p>
+                    <p className="mt-2 font-display text-3xl text-foreground">{validationResult?.verdict ?? "Awaiting analysis"}</p>
                   </div>
                 </div>
               </motion.div>
 
               <div className="mt-8 space-y-4">
-                {result.reasons.map((reason, index) => (
+                {(validationResult?.redFlags ?? []).map((reason: string, index: number) => (
                   <motion.div
                     key={reason}
                     initial={{ opacity: 0, y: 16, filter: "blur(8px)" }}
@@ -226,6 +233,11 @@ const FinfluencerDetector = ({ eventId }: FinfluencerDetectorProps) => {
                     {reason}
                   </motion.div>
                 ))}
+                {validationResult?.reasoning ? (
+                  <div className="rounded-[1.5rem] border border-border/30 bg-secondary/20 p-5 text-sm leading-7 text-foreground">
+                    {validationResult.reasoning}
+                  </div>
+                ) : null}
               </div>
             </motion.div>
           </AnimatePresence>
