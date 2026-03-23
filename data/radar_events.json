@@ -1,0 +1,18 @@
+{
+  "events": [
+    {
+      "title": "Stock Market Update: Sensex, Nifty hit all-time highs",
+      "source": "Mock Financial Times",
+      "url": "https://example.com/mock-1",
+      "publishedAt": "2026-03-23T10:00:00Z",
+      "description": "The Indian stock market indices, Sensex and Nifty, reached new record highs today fueled by positive global cues."
+    },
+    {
+      "title": "RBI Monetary Policy: Repo rate remains unchanged at 6.5%",
+      "source": "Mock Reserve News",
+      "url": "https://example.com/mock-2",
+      "publishedAt": "2026-03-23T11:30:00Z",
+      "description": "The Reserve Bank of India decided to keep the repo rate steady at 6.5% for the seventh consecutive time."
+    }
+  ]
+}
