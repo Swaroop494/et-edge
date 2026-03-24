@@ -7,6 +7,14 @@ const path = require('path');
 router.get('/', async (req, res) => {
     console.log("Fetching live news...");
     try {
+        const intervalMs = req.app.locals.newsFetchIntervalMs || 900000;
+        const cache = req.app.locals.newsCache || { data: null, fetchedAt: 0 };
+        const now = Date.now();
+
+        if (cache.data && now - cache.fetchedAt < intervalMs) {
+            return res.status(200).json(cache.data);
+        }
+
         const apiKey = process.env.NEWS_API_KEY || process.env.NEXT_PUBLIC_NEWS_API_KEY;
         if (!apiKey) {
             throw new Error("NewsAPI Key is missing in environment variables");
@@ -34,6 +42,10 @@ router.get('/', async (req, res) => {
                 publishedAt: article.publishedAt,
                 description: article.description || ""
             }));
+            req.app.locals.newsCache = {
+                data: articles,
+                fetchedAt: now
+            };
             console.log(`Live news fetched: ${articles.length} articles`);
             return res.status(200).json(articles);
         } else {
@@ -45,7 +57,12 @@ router.get('/', async (req, res) => {
             const mockDataPath = path.join(__dirname, "../../data/radar_events.json");
             const rawData = fs.readFileSync(mockDataPath, 'utf8');
             const mockData = JSON.parse(rawData);
-            return res.status(200).json(mockData.events);
+            const fallbackData = mockData.events;
+            req.app.locals.newsCache = {
+                data: fallbackData,
+                fetchedAt: now
+            };
+            return res.status(200).json(fallbackData);
         } catch (fsErr) {
             return res.status(500).json({ error: "Failed to load news and mock data" });
         }

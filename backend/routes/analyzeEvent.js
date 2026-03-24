@@ -3,11 +3,38 @@ const express = require('express');
 const router = express.Router();
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 
+const headlineAnalysisCache = new Map();
+
+const buildMockAnalysis = (headline, summary) => {
+    const text = `${headline} ${summary}`.toLowerCase();
+    let impactDirection = "mixed";
+    if (/(rise|rises|gain|gains|up|surge|beat|growth|record high|rally|strong)/.test(text)) {
+        impactDirection = "positive";
+    } else if (/(fall|falls|down|drop|drops|slump|miss|weak|decline|cut|loss)/.test(text)) {
+        impactDirection = "negative";
+    }
+
+    return {
+        eventType: /(rbi|inflation|gdp|budget|crude|oil|fed|interest rate|rupee|fii|geopolitical|policy)/.test(text) ? "macro" : "micro",
+        affectedSectors: ["Banking", "IT Services", "Energy"],
+        affectedStocks: ["HDFCBANK", "TCS", "RELIANCE"],
+        confidenceScore: 55,
+        whatHappened: headline,
+        whyItMatters: summary || "This event can influence investor sentiment and near-term market movement in India.",
+        impactDirection
+    };
+};
+
 router.post('/', async (req, res) => {
     const { headline, summary } = req.body;
 
     if (!headline || !summary) {
         return res.status(400).json({ error: "headline and summary are required" });
+    }
+
+    const normalizedHeadline = headline.trim().toLowerCase();
+    if (headlineAnalysisCache.has(normalizedHeadline)) {
+        return res.status(200).json(headlineAnalysisCache.get(normalizedHeadline));
     }
 
     try {
@@ -21,19 +48,28 @@ router.post('/', async (req, res) => {
 
         const prompt = `Analyze this Indian market event and return ONLY a valid JSON object with exactly these fields — eventType: string macro or micro, affectedSectors: array, affectedStocks: array, confidenceScore: number, whatHappened: string, whyItMatters: string, impactDirection: string. Headline: ${headline} Summary: ${summary}`;
 
-        const result = await model.generateContent(prompt);
-        const textResponse = result.response.text();
-        
-        const cleanedText = textResponse.replace(/```json/g, '').replace(/```/g, '').trim();
-        const parsedResponse = JSON.parse(cleanedText);
+        let parsedResponse;
+        try {
+            const result = await model.generateContent(prompt);
+            const textResponse = result.response.text();
+            const cleanedText = textResponse.replace(/```json/g, '').replace(/```/g, '').trim();
+            parsedResponse = JSON.parse(cleanedText);
+        } catch (analysisErr) {
+            const statusCode = analysisErr?.status || analysisErr?.response?.status;
+            console.error("Gemini analysis failed, returning mock analysis:", analysisErr?.message || analysisErr);
+            if (statusCode === 429 || analysisErr) {
+                parsedResponse = buildMockAnalysis(headline, summary);
+            }
+        }
+
+        headlineAnalysisCache.set(normalizedHeadline, parsedResponse);
         return res.status(200).json(parsedResponse);
 
     } catch (err) {
-        console.error("Event analysis error (Gemini):", err);
-        return res.status(500).json({ 
-            message: "Event analysis unavailable. Please try again.",
-            error: err.message 
-        });
+        const fallback = buildMockAnalysis(headline, summary);
+        headlineAnalysisCache.set(normalizedHeadline, fallback);
+        console.error("Event analysis route failed, returning fallback:", err);
+        return res.status(200).json(fallback);
     }
 });
 
