@@ -1,7 +1,10 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import Link from "next/link";
 import { motion } from "framer-motion";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { intelligenceEvents } from "@/data/intelligence";
 
 interface ChartIntelligenceProps {
   eventId: string;
@@ -9,8 +12,51 @@ interface ChartIntelligenceProps {
 
 const smoothEase: [number, number, number, number] = [0.16, 1, 0.3, 1];
 
-const ChartIntelligence = ({ eventId }: ChartIntelligenceProps) => {
-  const event = intelligenceEvents.find((item) => item.id === eventId) ?? intelligenceEvents[0];
+const ChartIntelligence = ({ eventId: _eventId }: ChartIntelligenceProps) => {
+  const [liveEvent, setLiveEvent] = useState<any | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const storedEvent = localStorage.getItem("et_edge_event_analysis");
+    if (storedEvent) {
+      const parsed = JSON.parse(storedEvent);
+      setLiveEvent(parsed);
+    }
+    setIsLoading(false);
+  }, []);
+
+  if (isLoading) {
+    return (
+      <div className="relative min-h-screen flex items-center justify-center">
+        <p>Loading event data...</p>
+      </div>
+    );
+  }
+
+  if (!liveEvent && !isLoading) {
+    return (
+      <div className="relative min-h-screen flex items-center justify-center">
+        <div>
+          <p>Select a news event on the Events page first.</p>
+          <Link href="/events" className="text-primary underline mt-4 block">
+            Go to Events →
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  const event = {
+    headline: liveEvent.whatHappened,
+    whyItMatters: liveEvent.whyItMatters,
+    title: liveEvent.eventType.charAt(0).toUpperCase() + liveEvent.eventType.slice(1),
+    summary: liveEvent.whatHappened,
+    sectors: liveEvent.affectedSectors,
+    affectedStocks: liveEvent.affectedStocks,
+    confidence: liveEvent.confidenceScore,
+    portfolioSignal: liveEvent.impactDirection,
+    reasoningTrace: [liveEvent.whatHappened, liveEvent.whyItMatters, "Impact direction: " + liveEvent.impactDirection],
+  };
 
   return (
     <section className="relative min-h-screen overflow-hidden px-6 py-24 md:px-10 lg:px-16">
