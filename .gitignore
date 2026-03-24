@@ -8,3 +8,9 @@
 node_modules/
 .next/
 .env
+
+node_modules/
+.env
+.env.*
+.next/
+dist/
