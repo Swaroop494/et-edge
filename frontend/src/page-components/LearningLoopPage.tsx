@@ -1,7 +1,25 @@
-import { motion } from "framer-motion";
+"use client";
+
+import { useState, useEffect } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import { Badge } from "@/components/ui/badge";
-import { BrainCircuit, Target, CheckCircle2, XCircle } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { BrainCircuit, Target, CheckCircle2, XCircle, Plus, Save, X } from "lucide-react";
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, AreaChart, Area } from "recharts";
+
+interface Prediction {
+  event: string;
+  predicted: string;
+  actual: string;
+  correct: boolean;
+}
+
+const fallbackPredictions: Prediction[] = [
+  { event: "RBI rate hike impact on banking", predicted: "NIFTY Bank -2.1%", actual: "NIFTY Bank -1.8%", correct: true },
+  { event: "IT earnings beat expectations", predicted: "TCS +3.2%", actual: "TCS +2.9%", correct: true },
+  { event: "FII outflow acceleration", predicted: "NIFTY -1.5%", actual: "NIFTY -1.7%", correct: true },
+];
 
 const weeklyData = [
   { week: "W1", accuracy: 68, predictions: 42, correct: 29 },
@@ -14,20 +32,50 @@ const weeklyData = [
   { week: "W8", accuracy: 76, predictions: 48, correct: 37 },
 ];
 
-const recentPredictions = [
-  { event: "RBI rate hike impact on banking", predicted: "NIFTY Bank -2.1%", actual: "NIFTY Bank -1.8%", correct: true },
-  { event: "IT earnings beat expectations", predicted: "TCS +3.2%", actual: "TCS +2.9%", correct: true },
-  { event: "Oil price surge effect", predicted: "ONGC +4.5%", actual: "ONGC +1.2%", correct: false },
-  { event: "FII outflow acceleration", predicted: "NIFTY -1.5%", actual: "NIFTY -1.7%", correct: true },
-  { event: "Rupee depreciation impact", predicted: "IT sector +2.0%", actual: "IT sector +2.4%", correct: true },
-  { event: "Monsoon forecast positive", predicted: "FMCG +1.8%", actual: "FMCG +0.3%", correct: false },
-];
-
 const smoothEase: [number, number, number, number] = [0.16, 1, 0.3, 1];
 
 const LearningLoopPage = () => {
-  const totalPredictions = weeklyData.reduce((sum, w) => sum + w.predictions, 0);
-  const totalCorrect = weeklyData.reduce((sum, w) => sum + w.correct, 0);
+  const [predictions, setPredictions] = useState<Prediction[]>([]);
+  const [isFormOpen, setIsFormOpen] = useState(false);
+  const [newPred, setNewPred] = useState({ event: "", predicted: "", actual: "" });
+
+  useEffect(() => {
+    const saved = localStorage.getItem("et_edge_predictions");
+    if (saved) {
+      try {
+        setPredictions(JSON.parse(saved));
+      } catch (e) {
+        setPredictions(fallbackPredictions);
+      }
+    } else {
+      setPredictions(fallbackPredictions);
+    }
+  }, []);
+
+  const handleSave = () => {
+    if (!newPred.event || !newPred.predicted || !newPred.actual) return;
+
+    const prediction: Prediction = {
+      ...newPred,
+      correct: newPred.actual.trim().toLowerCase() !== "pending" && newPred.actual.trim() !== "",
+    };
+
+    const updated = [prediction, ...predictions];
+    setPredictions(updated);
+    localStorage.setItem("et_edge_predictions", JSON.stringify(updated));
+    setNewPred({ event: "", predicted: "", actual: "" });
+    setIsFormOpen(false);
+  };
+
+  const weeklyTotalPredictions = weeklyData.reduce((sum, w) => sum + w.predictions, 0);
+  const weeklyTotalCorrect = weeklyData.reduce((sum, w) => sum + w.correct, 0);
+  const userPredictions = predictions.filter((p) => p.actual.trim().toLowerCase() !== "pending" && p.actual.trim() !== "");
+  const userCorrect = userPredictions.filter((p) => p.correct).length;
+  const totalPredictions = weeklyTotalPredictions + userPredictions.length;
+  const totalCorrect = weeklyTotalCorrect + userCorrect;
+
+  const currentAccuracy = totalPredictions > 0 ? Math.round((totalCorrect / totalPredictions) * 100) : 76;
+  const baseAccuracy = 68;
 
   return (
     <section className="relative min-h-screen overflow-hidden px-6 py-12 md:px-10 lg:px-16">
@@ -67,9 +115,9 @@ const LearningLoopPage = () => {
         {/* Stats row */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
           {[
-            { icon: BrainCircuit, label: "Current Accuracy", value: "76%", sub: "↑ from 68%", accent: true },
+            { icon: BrainCircuit, label: "Current Accuracy", value: `${currentAccuracy}%`, sub: `↑ from ${baseAccuracy}%`, accent: true },
             { icon: Target, label: "Total Predictions", value: totalPredictions.toString(), sub: "last 8 weeks" },
-            { icon: CheckCircle2, label: "Correct Calls", value: totalCorrect.toString(), sub: `${Math.round((totalCorrect / totalPredictions) * 100)}% hit rate` },
+            { icon: CheckCircle2, label: "Correct Calls", value: totalCorrect.toString(), sub: `${totalPredictions > 0 ? Math.round((totalCorrect / totalPredictions) * 100) : 0}% hit rate` },
           ].map((stat, i) => (
             <motion.div
               key={stat.label}
@@ -136,14 +184,72 @@ const LearningLoopPage = () => {
           transition={{ duration: 0.7, delay: 0.5, ease: smoothEase }}
           className="glass rounded-[2rem] p-8"
         >
-          <p className="text-xs uppercase tracking-[0.28em] text-text-secondary mb-6">Recent Predictions vs Outcomes</p>
-          <div className="space-y-3">
-            {recentPredictions.map((pred, i) => (
+          <div className="flex items-center justify-between mb-6">
+            <p className="text-xs uppercase tracking-[0.28em] text-text-secondary">Recent Predictions vs Outcomes</p>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setIsFormOpen(!isFormOpen)}
+              className="rounded-xl border-accent/20 bg-accent/5 text-accent hover:bg-accent/10"
+            >
+              {isFormOpen ? <X size={14} className="mr-2" /> : <Plus size={14} className="mr-2" />}
+              {isFormOpen ? "Cancel" : "Log new prediction"}
+            </Button>
+          </div>
+
+          <AnimatePresence>
+            {isFormOpen && (
               <motion.div
-                key={pred.event}
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: "auto" }}
+                exit={{ opacity: 0, height: 0 }}
+                className="overflow-hidden mb-6"
+              >
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-5 rounded-2xl border border-accent/20 bg-accent/5">
+                  <div className="space-y-2">
+                    <label className="text-[10px] uppercase tracking-wider text-text-secondary">Market Event</label>
+                    <Input
+                      placeholder="e.g. RBI Rate Decision"
+                      value={newPred.event}
+                      onChange={(e) => setNewPred({ ...newPred, event: e.target.value })}
+                      className="bg-background/50 border-border/20"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] uppercase tracking-wider text-text-secondary">Predicted Impact</label>
+                    <Input
+                      placeholder="e.g. Sensex +1.2%"
+                      value={newPred.predicted}
+                      onChange={(e) => setNewPred({ ...newPred, predicted: e.target.value })}
+                      className="bg-background/50 border-border/20"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] uppercase tracking-wider text-text-secondary">Actual Outcome</label>
+                    <div className="flex gap-2">
+                      <Input
+                        placeholder="e.g. Sensex +0.9%"
+                        value={newPred.actual}
+                        onChange={(e) => setNewPred({ ...newPred, actual: e.target.value })}
+                        className="bg-background/50 border-border/20"
+                      />
+                      <Button onClick={handleSave} size="icon" className="shrink-0 bg-accent hover:bg-accent/80">
+                        <Save size={16} />
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          <div className="space-y-3">
+            {predictions.map((pred, i) => (
+              <motion.div
+                key={`${pred.event}-${i}`}
                 initial={{ opacity: 0, x: -12 }}
                 animate={{ opacity: 1, x: 0 }}
-                transition={{ duration: 0.5, delay: 0.6 + i * 0.06, ease: smoothEase }}
+                transition={{ duration: 0.5, delay: 0.1 + i * 0.05, ease: smoothEase }}
                 className="flex items-center gap-4 rounded-[1.25rem] border border-border/20 bg-secondary/15 p-4"
               >
                 <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${pred.correct ? "bg-success/10" : "bg-critical/10"}`}>

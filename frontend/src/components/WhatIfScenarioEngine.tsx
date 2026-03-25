@@ -1,12 +1,13 @@
-import { useMemo, useState } from "react";
+"use client";
+
+import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { z } from "zod";
-import { ArrowDownRight, ArrowUpRight, Minus, SendHorizonal } from "lucide-react";
+import { ArrowDownRight, ArrowUpRight, Loader2, Minus, SendHorizonal } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
-import { scenarioLibrary } from "@/data/intelligence";
 
 const scenarioSchema = z.string().trim().min(8, "Ask a slightly fuller what-if question.").max(160, "Keep the scenario concise.");
 
@@ -16,24 +17,32 @@ const directionIcon = {
   Mixed: Minus,
 };
 
-const resolveScenario = (query: string) => {
-  const normalized = query.toLowerCase();
+interface AIResult {
+  label: string;
+  narrative: string;
+  risk: number;
+  sectors: { name: string; direction: "Up" | "Down" | "Mixed" }[];
+}
 
-  return (
-    scenarioLibrary.find((scenario) => normalized.includes(scenario.key)) ??
-    scenarioLibrary.find((scenario) => normalized.includes(scenario.label.toLowerCase().split(" ")[0])) ??
-    scenarioLibrary[0]
-  );
+const defaultResult: AIResult = {
+  label: "Awaiting Scenario",
+  narrative: "Input a market hypothetical to generate an AI-driven impact analysis.",
+  risk: 0,
+  sectors: [
+    { name: "Banking", direction: "Mixed" },
+    { name: "IT Services", direction: "Mixed" },
+    { name: "Auto", direction: "Mixed" },
+  ],
 };
 
 const WhatIfScenarioEngine = () => {
   const [query, setQuery] = useState("What if interest rates increase further?");
   const [error, setError] = useState("");
-  const [submittedQuery, setSubmittedQuery] = useState(query);
+  const [isLoading, setIsLoading] = useState(false);
+  const [aiResult, setAiResult] = useState<AIResult>(defaultResult);
+  const [submittedQuery, setSubmittedQuery] = useState("");
 
-  const scenario = useMemo(() => resolveScenario(submittedQuery), [submittedQuery]);
-
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     const parsed = scenarioSchema.safeParse(query);
 
     if (!parsed.success) {
@@ -42,8 +51,41 @@ const WhatIfScenarioEngine = () => {
     }
 
     setError("");
+    setIsLoading(true);
     setSubmittedQuery(parsed.data);
+
+    try {
+      const apiKey = process.env.NEXT_PUBLIC_GEMINI_API_KEY;
+      const prompt = `You are an Indian stock market analyst. A retail investor asks: ${parsed.data}. Return ONLY a valid JSON object with fields: label (string), narrative (string), risk (number 0-100), and sectors (array of objects with 'name' and 'direction'). Direction must be 'Up', 'Down', or 'Mixed'. 3 sectors minimum.`;
+
+      const response = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: prompt }] }],
+          }),
+        }
+      );
+
+      const data = await response.json();
+      const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
+      
+      // Extract JSON from markdown if present
+      const jsonString = rawText.replace(/```json|```/gi, "").trim();
+      const result = JSON.parse(jsonString) as AIResult;
+      
+      setAiResult(result);
+    } catch (err) {
+      console.error("AI Fetch Error:", err);
+      setError("Failed to generate AI analysis. Please try again.");
+    } finally {
+      setIsLoading(false);
+    }
   };
+
+  const displayResult = aiResult;
 
   return (
     <section className="relative min-h-screen overflow-hidden px-6 py-24 md:px-10 lg:px-16">
@@ -79,7 +121,15 @@ const WhatIfScenarioEngine = () => {
           </p>
         </div>
 
-        <div className="glass-strong rounded-[2rem] p-6 md:p-8">
+        <div className="glass-strong rounded-[2rem] p-6 md:p-8 relative overflow-hidden">
+          {isLoading && (
+            <div className="absolute inset-0 z-20 flex items-center justify-center bg-background/40 backdrop-blur-sm animate-pulse">
+              <div className="flex items-center gap-3 text-primary font-medium">
+                <Loader2 className="animate-spin" size={20} />
+                <span>Analysing with AI...</span>
+              </div>
+            </div>
+          )}
           <div className="flex flex-col gap-4 lg:flex-row">
             <Input
               value={query}
@@ -87,9 +137,10 @@ const WhatIfScenarioEngine = () => {
               onKeyDown={(event) => event.key === "Enter" && handleSubmit()}
               placeholder="What if interest rates increase?"
               className="h-12 rounded-2xl border-border/30 bg-secondary/30 text-foreground placeholder:text-text-secondary/60 focus-visible:ring-primary/40"
+              disabled={isLoading}
             />
-            <Button onClick={handleSubmit} className="h-12 rounded-2xl px-6">
-              <SendHorizonal size={16} />
+            <Button onClick={handleSubmit} className="h-12 rounded-2xl px-6" disabled={isLoading}>
+              {isLoading ? <Loader2 className="animate-spin mr-2" size={16} /> : <SendHorizonal size={16} />}
               Run scenario
             </Button>
           </div>
@@ -98,7 +149,7 @@ const WhatIfScenarioEngine = () => {
 
         <AnimatePresence mode="wait">
           <motion.div
-            key={submittedQuery}
+            key={submittedQuery || "initial"}
             initial={{ opacity: 0, y: 22, filter: "blur(12px)" }}
             animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
             exit={{ opacity: 0, y: -16, filter: "blur(10px)" }}
@@ -107,26 +158,26 @@ const WhatIfScenarioEngine = () => {
           >
             <div className="glass rounded-[2rem] p-8">
               <p className="text-xs uppercase tracking-[0.28em] text-text-secondary">Scenario read</p>
-              <h3 className="mt-4 font-display text-3xl text-foreground">{scenario.label}</h3>
-              <p className="mt-4 text-sm leading-7 text-text-secondary">{scenario.narrative}</p>
+              <h3 className="mt-4 font-display text-3xl text-foreground">{displayResult.label}</h3>
+              <p className="mt-4 text-sm leading-7 text-text-secondary">{displayResult.narrative}</p>
 
               <div className="mt-8">
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-text-secondary">Risk level</span>
-                  <span className="text-foreground">{scenario.risk}%</span>
+                  <span className="text-foreground">{displayResult.risk}%</span>
                 </div>
-                <Progress value={scenario.risk} className="mt-3 h-3 bg-secondary/70" />
+                <Progress value={displayResult.risk} className="mt-3 h-3 bg-secondary/70" />
               </div>
             </div>
 
             <div className="glass rounded-[2rem] p-8">
               <p className="text-xs uppercase tracking-[0.28em] text-text-secondary">Affected sectors</p>
               <div className="mt-6 grid gap-4 md:grid-cols-3">
-                {scenario.sectors.map((sector, index) => {
-                  const Icon = directionIcon[sector.direction];
+                {displayResult.sectors.map((sector, index) => {
+                  const Icon = directionIcon[sector.direction] || Minus;
                   return (
                     <motion.div
-                      key={sector.name}
+                      key={`${sector.name}-${index}`}
                       initial={{ opacity: 0, y: 16, filter: "blur(8px)" }}
                       animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
                       transition={{ duration: 0.55, delay: index * 0.08, ease: [0.16, 1, 0.3, 1] }}
