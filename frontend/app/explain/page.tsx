@@ -1,7 +1,9 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import DashboardLayout from "@/components/DashboardLayout";
-import Explainability from "@/page-components/Explainability";
+
+const Explainability = dynamic(() => import("@/page-components/Explainability"), { ssr: false });
 
 export default function ExplainPage() {
   return (

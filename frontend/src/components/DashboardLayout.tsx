@@ -3,6 +3,7 @@
 import { usePathname, useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { Activity, ArrowLeft } from "lucide-react";
+import Image from "next/image";
 import CursorGlow from "@/components/CursorGlow";
 import DashboardNav from "@/components/DashboardNav";
 import etEdgeLogo from "@/assets/et-edge-logo.png";
@@ -30,7 +31,7 @@ const DashboardLayout = ({ children }: DashboardLayoutProps) => {
           onClick={() => router.push("/")}
           className="flex items-center gap-2 hover:opacity-80 transition-opacity duration-300"
         >
-          <img src={etEdgeLogo.src} alt="ET Edge" className="w-8 h-8 rounded-full object-cover drop-shadow-[0_0_8px_hsl(var(--neon-cyan)/0.3)]" />
+          <Image src={etEdgeLogo} alt="ET Edge" width={32} height={32} className="rounded-full object-cover drop-shadow-[0_0_8px_hsl(var(--neon-cyan)/0.3)]" priority />
           <span className="font-display text-sm font-bold tracking-wide">
             <span style={{ background: "linear-gradient(135deg, hsl(var(--neon-cyan)), hsl(var(--teal)))", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text" }}>ET</span>
             {" "}

@@ -1,7 +1,9 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import DashboardLayout from "@/components/DashboardLayout";
-import WhatIfPage from "@/page-components/WhatIfPage";
+
+const WhatIfPage = dynamic(() => import("@/page-components/WhatIfPage"), { ssr: false });
 
 export default function WhatIfRoutePage() {
   return (

@@ -1,7 +1,9 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import DashboardLayout from "@/components/DashboardLayout";
-import EventIntelligence from "@/page-components/EventIntelligence";
+
+const EventIntelligence = dynamic(() => import("@/page-components/EventIntelligence"), { ssr: false });
 
 export default function EventsPage() {
   return (

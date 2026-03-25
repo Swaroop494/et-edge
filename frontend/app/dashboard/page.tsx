@@ -1,7 +1,9 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import DashboardLayout from "@/components/DashboardLayout";
-import Dashboard from "@/page-components/Dashboard";
+
+const Dashboard = dynamic(() => import("@/page-components/Dashboard"), { ssr: false });
 
 export default function DashboardPage() {
   return (
