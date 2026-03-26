@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 import { motion, AnimatePresence } from "framer-motion";
 import { z } from "zod";
 import { ArrowDownRight, ArrowUpRight, Loader2, Minus, SendHorizonal } from "lucide-react";
@@ -41,6 +42,7 @@ const WhatIfScenarioEngine = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [aiResult, setAiResult] = useState<AIResult>(defaultResult);
   const [submittedQuery, setSubmittedQuery] = useState("");
+  const [engineSource, setEngineSource] = useState<"Groq" | "Gemini" | "Demo">("Groq");
 
   const handleSubmit = async () => {
     const parsed = scenarioSchema.safeParse(query);
@@ -54,35 +56,33 @@ const WhatIfScenarioEngine = () => {
     setIsLoading(true);
     setSubmittedQuery(parsed.data);
 
+    const prompt = `You are an Indian stock market analyst. A retail investor asks: ${parsed.data}. Return ONLY a valid JSON object with fields: label (string), narrative (string), risk (number 0-100), and sectors (array of objects with 'name' and 'direction'). Direction must be 'Up', 'Down', or 'Mixed'. 3 sectors minimum.`;
+
+    const fallbackResult: AIResult = {
+      label: "Gold Surge Anticipated",
+      narrative: "Due to ongoing geopolitical uncertainties and shifting bond yields, we've switched to diagnostic mode. Gold remains a primary safe-haven asset, drawing capital from equity segments.",
+      risk: 45,
+      sectors: [
+        { name: "Precious Metals", direction: "Up" },
+        { name: "Banking", direction: "Down" },
+        { name: "Real Estate", direction: "Down" },
+      ]
+    };
+
     try {
-      const apiKey = process.env.NEXT_PUBLIC_CLAUDE_API_KEY || "";
-      const prompt = `You are an Indian stock market analyst. A retail investor asks: ${parsed.data}. Return ONLY a valid JSON object with fields: label (string), narrative (string), risk (number 0-100), and sectors (array of objects with 'name' and 'direction'). Direction must be 'Up', 'Down', or 'Mixed'. 3 sectors minimum.`;
-
-      const response = await fetch("https://api.anthropic.com/v1/messages", {
-        method: "POST",
-        headers: {
-          "x-api-key": apiKey,
-          "anthropic-version": "2023-06-01",
-          "content-type": "application/json",
-        },
-        body: JSON.stringify({
-          model: "claude-3-5-sonnet-20241022",
-          max_tokens: 1024,
-          messages: [{ role: "user", content: prompt }],
-        }),
-      });
-
-      const data = await response.json();
-      const rawText = data?.content?.[0]?.text ?? "";
-
-      // Extract JSON from markdown code blocks if present
+      // Primary: Gemini 1.5 Flash
+      const genAI = new GoogleGenerativeAI(process.env.NEXT_PUBLIC_GEMINI_API_KEY || "");
+      const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash-latest" });
+      const result = await model.generateContent(prompt);
+      const rawText = result.response.text();
       const jsonString = rawText.replace(/```json|```/gi, "").trim();
-      const result = JSON.parse(jsonString) as AIResult;
-
-      setAiResult(result);
+      setAiResult(JSON.parse(jsonString) as AIResult);
+      setEngineSource("Gemini");
     } catch (err) {
-      console.error("AI Fetch Error:", err);
-      setError("Failed to generate AI analysis. Please try again.");
+      console.warn("Primary engine unavailable, activating Demo safety fallback:", err);
+      // Emergency: Direct fallback to mock data (demo mode)
+      setAiResult(fallbackResult);
+      setEngineSource("Demo");
     } finally {
       setIsLoading(false);
     }
@@ -159,17 +159,25 @@ const WhatIfScenarioEngine = () => {
             transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
             className="grid gap-6 lg:grid-cols-[0.82fr_1.18fr]"
           >
-            <div className="glass rounded-[2rem] p-8">
+            <div className="glass rounded-[2rem] p-8 relative">
               <p className="text-xs uppercase tracking-[0.28em] text-text-secondary">Scenario read</p>
               <h3 className="mt-4 font-display text-3xl text-foreground">{displayResult.label}</h3>
               <p className="mt-4 text-sm leading-7 text-text-secondary">{displayResult.narrative}</p>
 
-              <div className="mt-8">
+              <div className="mt-8 pb-10">
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-text-secondary">Risk level</span>
                   <span className="text-foreground">{displayResult.risk}%</span>
                 </div>
                 <Progress value={displayResult.risk} className="mt-3 h-3 bg-secondary/70" />
+              </div>
+
+              {/* Attribution Text */}
+              <div className="absolute bottom-6 left-8 flex items-center gap-2">
+                <div className={`h-1.5 w-1.5 rounded-full ${engineSource === 'Demo' ? 'bg-orange-500' : 'bg-emerald-500'}`} />
+                <span className="text-[10px] font-semibold uppercase tracking-widest text-text-secondary/60">
+                  {engineSource === 'Demo' ? 'Demo Mode' : `Powered by ${engineSource}`}
+                </span>
               </div>
             </div>
 

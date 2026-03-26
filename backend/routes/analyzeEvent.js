@@ -40,9 +40,9 @@ router.post('/', async (req, res) => {
     try {
         const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
         
-        // Use Gemini 2.0 Flash Lite for high speed and better quota availability
+        // Use gemini-2.5-flash-lite for high-performance extraction
         const model = genAI.getGenerativeModel({ 
-            model: "gemini-2.0-flash-lite",
+            model: "gemini-2.5-flash-lite",
             systemInstruction: "You are an Indian financial market event classifier. You only respond in valid JSON with no additional text, explanation, or markdown code blocks outside the JSON object. Never wrap response in backticks. Classify events as macro or micro. Macro events are broad economic events like RBI decisions, Union Budget, inflation data, global oil prices, geopolitical events affecting India. Micro events are company specific like quarterly earnings, mergers, acquisitions, management changes, block deals, insider trading. Return confidence score 0-100 based on clarity of market impact. Never use financial jargon."
         });
 
@@ -55,11 +55,8 @@ router.post('/', async (req, res) => {
             const cleanedText = textResponse.replace(/```json/g, '').replace(/```/g, '').trim();
             parsedResponse = JSON.parse(cleanedText);
         } catch (analysisErr) {
-            const statusCode = analysisErr?.status || analysisErr?.response?.status;
-            console.error("Gemini analysis failed, returning mock analysis:", analysisErr?.message || analysisErr);
-            if (statusCode === 429 || analysisErr) {
-                parsedResponse = buildMockAnalysis(headline, summary);
-            }
+            console.error("Gemini analysis failed, returning mock analysis fallback:", analysisErr?.message || analysisErr);
+            parsedResponse = buildMockAnalysis(headline, summary);
         }
 
         headlineAnalysisCache.set(normalizedHeadline, parsedResponse);

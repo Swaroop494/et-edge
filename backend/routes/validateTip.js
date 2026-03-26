@@ -1,38 +1,54 @@
 // ET Edge — Validate Tip Route. The Finfluencer BS Detector. Accepts stock tip + news context, returns validity analysis.
 const express = require('express');
-const Anthropic = require('@anthropic-ai/sdk');
+const { GoogleGenerativeAI } = require('@google/generative-ai');
 const router = express.Router();
+
+const buildMockValidation = (tipText) => {
+  return {
+    validityScore: 45,
+    verdict: "Misleading",
+    reasoning: "The tip uses urgent language typical of social media pumping schemes. While the stock exists, there is no verifiable news context to support the specific target price mentioned.",
+    redFlags: ["Urgent language", "Unverified price target", "Source uncertainty"],
+    positiveSignals: ["Company is listed on NSE"]
+  };
+};
 
 router.post('/', async (req, res) => {
   try {
-    if (!req.body.tipText || !req.body.newsContext) {
-      return res.status(400).json({ error: 'tipText and newsContext are required' });
+    const tip = req.body.tip || req.body.tipText;
+    const newsContext = req.body.newsContext || "No context provided";
+
+    if (!tip) {
+      return res.status(400).json({ error: 'tip is required' });
     }
 
-    const client = new Anthropic({ apiKey: process.env.CLAUDE_API_KEY });
+    let parsedResponse;
+    try {
+      const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+      const model = genAI.getGenerativeModel({ 
+        model: 'gemini-2.5-flash-lite',
+        systemInstruction: 'You are a financial fraud detector protecting Indian retail investors. You only respond in valid JSON with no additional text or markdown outside the JSON. Analyze tips for misinformation, pumping schemes, or verified facts. Cross-reference every claim in the tip against available news context.'
+      });
 
-    const response = await client.messages.create({
-      model: 'claude-sonnet-4-20250514',
-      max_tokens: 1000,
-      system: 'You are a financial misinformation detector protecting Indian retail investors from fake stock tips on WhatsApp and social media. You only respond in valid JSON with no additional text or markdown outside the JSON. Be appropriately skeptical of tips that promise guaranteed returns, give specific price targets with no evidence, use urgent language like buy now or last chance, mention insider information, or make claims contradicting recent verified news. Cross-reference every claim in the tip against the provided news context. Write all explanations in simple plain English for someone with zero finance knowledge.',
-      messages: [
-        {
-          role: 'user',
-          content: 'Analyze this stock tip and cross-reference against today\'s news context. Return ONLY a valid JSON object with exactly these fields — validityScore: number 0-100 where 100 is completely verified true and 0 is completely false, verdict: string exactly one of Likely True or Misleading or Likely False, reasoning: string 2 to 3 plain English sentences explaining your score mentioning specific facts from news context if relevant, redFlags: array of strings each being one suspicious claim or phrase found in the tip empty array if none, positiveSignals: array of strings each being one claim that checks out against news context empty array if none. Tip to validate: ' + req.body.tipText + ' Today\'s news context: ' + req.body.newsContext,
-        },
-      ],
-    });
+      const prompt = `You are a financial fraud detector. Analyze this tip: "${tip}". Cross-reference it with the latest live news. Today's news context: ${newsContext}. Return ONLY a valid JSON object with exactly these fields — score: number 0-100 where 100 is completely verified true and 0 is fake, verdict: string exactly one of Valid or Misleading or Noise, reason: string 2 to 3 plain English sentences explaining your verdict.`;
 
-    let text = response.content[0].text;
-    text = text.replace(/```json/g, '').replace(/```/g, '').trim();
-    const parsed = JSON.parse(text);
+      const result = await model.generateContent(prompt);
+      const text = result.response.text();
+      const cleanedText = text.replace(/```json/g, '').replace(/```/g, '').trim();
+      parsedResponse = JSON.parse(cleanedText);
+    } catch (aiErr) {
+      console.error("Gemini tip validation failed, using mock fallback:", aiErr.message);
+      parsedResponse = {
+        score: 45,
+        verdict: "Misleading",
+        reason: "The system is currently in diagnostic mode. This tip exhibits patterns commonly associated with social media speculation."
+      };
+    }
 
-    return res.status(200).json(parsed);
+    return res.status(200).json(parsedResponse);
   } catch (err) {
-    return res.status(500).json({
-      message: 'Validation unavailable. Please try again.',
-      error: err.message,
-    });
+    console.error("Validate tip route error:", err);
+    return res.status(500).json({ error: "Internal server error" });
   }
 });
 
