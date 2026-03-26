@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -35,22 +35,19 @@ const weeklyData = [
 const smoothEase: [number, number, number, number] = [0.16, 1, 0.3, 1];
 
 const LearningLoopPage = () => {
-  const [predictions, setPredictions] = useState<Prediction[]>([]);
-  const [isFormOpen, setIsFormOpen] = useState(false);
-  const [newPred, setNewPred] = useState({ event: "", predicted: "", actual: "" });
-
-  useEffect(() => {
+  const [predictions, setPredictions] = useState<Prediction[]>(() => {
     const saved = localStorage.getItem("et_edge_predictions");
     if (saved) {
       try {
-        setPredictions(JSON.parse(saved));
-      } catch (e) {
-        setPredictions(fallbackPredictions);
+        return JSON.parse(saved) as Prediction[];
+      } catch {
+        return fallbackPredictions;
       }
-    } else {
-      setPredictions(fallbackPredictions);
     }
-  }, []);
+    return fallbackPredictions;
+  });
+  const [isFormOpen, setIsFormOpen] = useState(false);
+  const [newPred, setNewPred] = useState({ event: "", predicted: "", actual: "" });
 
   const handleSave = () => {
     if (!newPred.event || !newPred.predicted || !newPred.actual) return;

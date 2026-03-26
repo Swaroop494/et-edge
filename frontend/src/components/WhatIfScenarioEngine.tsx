@@ -55,27 +55,30 @@ const WhatIfScenarioEngine = () => {
     setSubmittedQuery(parsed.data);
 
     try {
-      const apiKey = process.env.NEXT_PUBLIC_GEMINI_API_KEY;
+      const apiKey = process.env.NEXT_PUBLIC_CLAUDE_API_KEY;
       const prompt = `You are an Indian stock market analyst. A retail investor asks: ${parsed.data}. Return ONLY a valid JSON object with fields: label (string), narrative (string), risk (number 0-100), and sectors (array of objects with 'name' and 'direction'). Direction must be 'Up', 'Down', or 'Mixed'. 3 sectors minimum.`;
 
-      const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            contents: [{ parts: [{ text: prompt }] }],
-          }),
-        }
-      );
+      const response = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: {
+          "x-api-key": apiKey,
+          "anthropic-version": "2023-06-01",
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          model: "claude-3-5-sonnet-20241022",
+          max_tokens: 1024,
+          messages: [{ role: "user", content: prompt }],
+        }),
+      });
 
       const data = await response.json();
-      const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
-      
-      // Extract JSON from markdown if present
+      const rawText = data?.content?.[0]?.text ?? "";
+
+      // Extract JSON from markdown code blocks if present
       const jsonString = rawText.replace(/```json|```/gi, "").trim();
       const result = JSON.parse(jsonString) as AIResult;
-      
+
       setAiResult(result);
     } catch (err) {
       console.error("AI Fetch Error:", err);
@@ -85,7 +88,7 @@ const WhatIfScenarioEngine = () => {
     }
   };
 
-  const displayResult = aiResult;
+  const displayResult = aiResult ?? defaultResult;
 
   return (
     <section className="relative min-h-screen overflow-hidden px-6 py-24 md:px-10 lg:px-16">
