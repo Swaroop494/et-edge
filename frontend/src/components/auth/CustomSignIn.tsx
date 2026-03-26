@@ -116,7 +116,7 @@ export function CustomSignIn() {
           {/* Top text */}
           <div className="relative z-20 flex items-center gap-4">
             <span className="text-white/70 text-xs font-semibold tracking-[0.2em] uppercase">
-              A Wise Quote
+              Where news meets action 
             </span>
             <div className="h-[1px] w-12 bg-white/30" />
           </div>
@@ -124,14 +124,14 @@ export function CustomSignIn() {
           {/* Bottom text block */}
           <div className="relative z-20 mt-auto pb-8 pr-12">
             <h1 className="text-5xl lg:text-[4rem] font-serif text-white leading-[1.1] tracking-tight mb-6">
-              Get
+              The
               <br />
-              Everything
+              Economic
               <br />
-              You Want
+              Edge You Need
             </h1>
             <p className="text-white/70 text-sm leading-relaxed max-w-sm font-medium">
-              You can get everything you want if you work hard, trust the process, and stick to the plan.
+              Contextualizing global news into actionable insights for the modern investor.
             </p>
           </div>
         </div>
@@ -141,15 +141,16 @@ export function CustomSignIn() {
           
           {/* Logo (Top Center) */}
           <div className="absolute top-10 left-0 right-0 flex justify-center items-center gap-2">
-            <div className="w-6 h-6 rounded-full border border-black/80 flex items-center justify-center opacity-80">
-              <svg viewBox="0 0 24 24" fill="none" className="w-4 h-4 stroke-black stroke-2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10S17.523 2 12 2z"/>
-                <path d="M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8z"/>
-                <path d="M12 2v20"/>
-                <path d="M2 12h20"/>
-              </svg>
+            <div className="w-8 h-8 flex items-center justify-center">
+              <Image 
+                src="/favicon.ico" 
+                alt="ET EDGE Logo" 
+                width={24} 
+                height={24} 
+                className="object-contain"
+              />
             </div>
-            <span className="font-semibold text-lg text-black tracking-tight">Cogie</span>
+            <span className="font-semibold text-lg text-black tracking-tight">ET EDGE</span>
           </div>
 
           <div className="w-full max-w-[400px]">
