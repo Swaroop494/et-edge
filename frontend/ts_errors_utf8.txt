@@ -1,0 +1,15 @@
+﻿src/components/auth/CustomSignIn.tsx(32,11): error TS2339: Property 'isLoaded' does not exist on type 'SignInSignalValue'.
+src/components/auth/CustomSignIn.tsx(32,29): error TS2339: Property 'setActive' does not exist on type 'SignInSignalValue'.
+src/components/auth/CustomSignIn.tsx(56,9): error TS2353: Object literal may only specify known properties, and 'password' does not exist in type 'SignInFutureCreateParams'.
+src/components/auth/CustomSignIn.tsx(59,18): error TS2339: Property 'status' does not exist on type '{ error: ClerkError | null; }'.
+src/components/auth/CustomSignIn.tsx(60,43): error TS2339: Property 'createdSessionId' does not exist on type '{ error: ClerkError | null; }'.
+src/components/auth/CustomSignIn.tsx(79,20): error TS2339: Property 'authenticateWithRedirect' does not exist on type 'SignInFutureResource'.
+src/components/DashboardNav.tsx(89,13): error TS2322: Type '{ afterSignOutUrl: string; appearance: { elements: { avatarBox: string; userButtonPopoverCard: string; userButtonPopoverActionButton: string; userButtonPopoverActionButtonText: string; userButtonPopoverFooter: string; }; }; }' is not assignable to type 'IntrinsicAttributes & Without<WithClerkProp<PropsWithChildren<UserButtonPropsWithoutCustomPages> & FallbackProp>, "clerk">'.
+  Property 'afterSignOutUrl' does not exist on type 'IntrinsicAttributes & Without<WithClerkProp<PropsWithChildren<UserButtonPropsWithoutCustomPages> & FallbackProp>, "clerk">'.
+src/components/WhatIfScenarioEngine.tsx(63,9): error TS2769: No overload matches this call.
+  Overload 1 of 2, '(input: string | URL | Request, init?: RequestInit | undefined): Promise<Response>', gave the following error.
+    Type '{ "x-api-key": string | undefined; "anthropic-version": string; "content-type": string; }' is not assignable to type 'HeadersInit | undefined'.
+      Type '{ "x-api-key": string | undefined; "anthropic-version": string; "content-type": string; }' is not assignable to type 'undefined'.
+  Overload 2 of 2, '(input: URL | RequestInfo, init?: RequestInit | undefined): Promise<Response>', gave the following error.
+    Type '{ "x-api-key": string | undefined; "anthropic-version": string; "content-type": string; }' is not assignable to type 'HeadersInit | undefined'.
+      Type '{ "x-api-key": string | undefined; "anthropic-version": string; "content-type": string; }' is not assignable to type 'undefined'.

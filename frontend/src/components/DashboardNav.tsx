@@ -86,7 +86,6 @@ const DashboardNav = () => {
         })}
         <div className="mt-auto pt-4 border-t border-border/20 flex items-center justify-center">
           <UserButton
-            afterSignOutUrl="/"
             appearance={{
               elements: {
                 avatarBox: "w-8 h-8 rounded-xl",

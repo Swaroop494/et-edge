@@ -55,7 +55,7 @@ const WhatIfScenarioEngine = () => {
     setSubmittedQuery(parsed.data);
 
     try {
-      const apiKey = process.env.NEXT_PUBLIC_CLAUDE_API_KEY;
+      const apiKey = process.env.NEXT_PUBLIC_CLAUDE_API_KEY || "";
       const prompt = `You are an Indian stock market analyst. A retail investor asks: ${parsed.data}. Return ONLY a valid JSON object with fields: label (string), narrative (string), risk (number 0-100), and sectors (array of objects with 'name' and 'direction'). Direction must be 'Up', 'Down', or 'Mixed'. 3 sectors minimum.`;
 
       const response = await fetch("https://api.anthropic.com/v1/messages", {

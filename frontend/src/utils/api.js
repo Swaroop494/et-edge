@@ -1,6 +1,6 @@
 // ET Edge — Frontend API utility. Import these functions to call the backend.
 
-const API_BASE = "http://localhost:5000/api";
+const API_BASE = "http://localhost:5001/api";
 
 export async function fetchLiveNews() {
   try {
