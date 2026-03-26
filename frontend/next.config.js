@@ -5,6 +5,7 @@ const nextConfig = {
     remotePatterns: [
       { protocol: "https", hostname: "newsapi.org" },
       { protocol: "https", hostname: "api.anthropic.com" },
+      { protocol: "https", hostname: "lh3.googleusercontent.com" },
     ],
   },
   turbopack: {

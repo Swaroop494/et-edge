@@ -2,9 +2,10 @@
 
 import { usePathname, useRouter } from "next/navigation";
 import { motion } from "framer-motion";
-import { LayoutGrid, Radio, Brain, BarChart3, Video, Shield, GitFork, TrendingUp } from "lucide-react";
-import { UserButton } from "@clerk/nextjs";
-
+import { LayoutGrid, Radio, Brain, BarChart3, Video, Shield, GitFork, TrendingUp, LogOut } from "lucide-react";
+import { useAuth } from "@/context/AuthContext";
+import { auth } from "@/lib/firebase";
+import { signOut } from "firebase/auth";
 const moduleConfig = [
   { icon: LayoutGrid, label: "Dashboard", path: "/dashboard" },
   { icon: Radio, label: "Events", path: "/events" },
@@ -19,6 +20,7 @@ const moduleConfig = [
 const DashboardNav = () => {
   const pathname = usePathname();
   const router = useRouter();
+  const { user } = useAuth();
 
   return (
     <nav className="fixed right-3 top-1/2 z-50 hidden -translate-y-1/2 md:flex md:flex-col md:items-center md:gap-1">
@@ -84,18 +86,24 @@ const DashboardNav = () => {
             </motion.button>
           );
         })}
-        <div className="mt-auto pt-4 border-t border-border/20 flex items-center justify-center">
-          <UserButton
-            appearance={{
-              elements: {
-                avatarBox: "w-8 h-8 rounded-xl",
-                userButtonPopoverCard: "bg-secondary/90 backdrop-blur-xl border border-border/30 rounded-2xl",
-                userButtonPopoverActionButton: "text-foreground hover:bg-secondary/60 rounded-xl",
-                userButtonPopoverActionButtonText: "text-foreground text-sm",
-                userButtonPopoverFooter: "hidden",
-              },
+        <div className="mt-auto pt-4 border-t border-border/20 flex flex-col items-center justify-center gap-2">
+          {user?.photoURL ? (
+            <img src={user.photoURL} alt="User Profile" className="w-8 h-8 rounded-full" />
+          ) : (
+            <div className="w-8 h-8 rounded-full bg-secondary flex items-center justify-center">
+              <span className="text-xs font-bold">{user?.email?.charAt(0).toUpperCase()}</span>
+            </div>
+          )}
+          <button
+            onClick={() => {
+              signOut(auth);
+              router.push("/");
             }}
-          />
+            className="p-2 text-muted-foreground/50 hover:text-red-500 transition-colors"
+            title="Logout"
+          >
+            <LogOut className="w-4 h-4" />
+          </button>
         </div>
       </div>
     </nav>

@@ -1,7 +1,6 @@
 "use client";
 
 import * as React from "react";
-import { useClerk } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
@@ -9,6 +8,8 @@ import * as z from "zod";
 import { Eye, EyeOff, Loader2 } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
+import { auth } from "@/lib/firebase";
+import { signInWithEmailAndPassword, signInWithPopup, GoogleAuthProvider } from "firebase/auth";
 
 import {
   Form,
@@ -29,8 +30,6 @@ const formSchema = z.object({
 });
 
 export function CustomSignIn() {
-  const { client, setActive, loaded } = useClerk();
-  const signIn = client?.signIn;
   const router = useRouter();
   const [showPassword, setShowPassword] = React.useState(false);
   const [isLoading, setIsLoading] = React.useState(false);
@@ -47,46 +46,31 @@ export function CustomSignIn() {
   });
 
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
-    if (!loaded || !signIn) return;
     setIsLoading(true);
     setError(null);
 
     try {
-      const result = await signIn.create({
-        identifier: values.email,
-        // @ts-ignore
-        password: values.password,
-      });
-
-      if (result.status === "complete") {
-        // @ts-ignore
-        await setActive({ session: result.createdSessionId });
-        router.push("/");
-      } else {
-        // Log the user in to handle further steps if any (MFA, etc)
-        console.log("Sign in incomplete", result);
-        setError("Sign in requires additional steps not supported here.");
-      }
+      await signInWithEmailAndPassword(auth, values.email, values.password);
+      router.push("/dashboard");
     } catch (err: any) {
       console.error(err);
-      setError(err.errors?.[0]?.message || "Failed to sign in. Please check your credentials.");
+      setError(err.message || "Failed to sign in. Please check your credentials.");
     } finally {
       setIsLoading(false);
     }
   };
 
   const handleGoogleSignIn = async () => {
-    if (!loaded || !signIn) return;
     setIsGoogleLoading(true);
+    setError(null);
     try {
-      await signIn.authenticateWithRedirect({
-        strategy: "oauth_google",
-        redirectUrl: "/sso-callback",
-        redirectUrlComplete: "/",
-      });
+      const provider = new GoogleAuthProvider();
+      await signInWithPopup(auth, provider);
+      router.push("/dashboard");
     } catch (err: any) {
       console.error(err);
-      setError(err.errors?.[0]?.message || "Failed to authenticate with Google.");
+      setError(err.message || "Failed to authenticate with Google.");
+    } finally {
       setIsGoogleLoading(false);
     }
   };
@@ -252,7 +236,7 @@ export function CustomSignIn() {
                 <div className="space-y-4 pt-2">
                   <Button
                     type="submit"
-                    disabled={isLoading || !loaded || !signIn}
+                    disabled={isLoading}
                     className="w-full bg-black text-white hover:bg-black/90 h-12 rounded-xl text-[14px] font-semibold tracking-wide"
                   >
                     {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Sign In"}
@@ -261,7 +245,7 @@ export function CustomSignIn() {
                   <Button
                     type="button"
                     variant="outline"
-                    disabled={isGoogleLoading || !loaded || !signIn}
+                    disabled={isGoogleLoading}
                     onClick={handleGoogleSignIn}
                     className="w-full bg-white text-black border-gray-200 hover:bg-gray-50 h-12 rounded-xl text-[14px] font-semibold tracking-wide flex items-center justify-center gap-2"
                   >
