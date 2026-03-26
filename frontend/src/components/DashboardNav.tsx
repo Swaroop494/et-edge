@@ -1,11 +1,13 @@
 "use client";
 
+import { useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { motion } from "framer-motion";
-import { LayoutGrid, Radio, Brain, BarChart3, Video, Shield, GitFork, TrendingUp, LogOut } from "lucide-react";
+import { LayoutGrid, Radio, Brain, BarChart3, Video, Shield, GitFork, TrendingUp, LogOut, Loader2 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { auth } from "@/lib/firebase";
 import { signOut } from "firebase/auth";
+import { toast } from "@/components/ui/sonner";
 const moduleConfig = [
   { icon: LayoutGrid, label: "Dashboard", path: "/dashboard" },
   { icon: Radio, label: "Events", path: "/events" },
@@ -21,6 +23,7 @@ const DashboardNav = () => {
   const pathname = usePathname();
   const router = useRouter();
   const { user } = useAuth();
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
 
   return (
     <nav className="fixed right-3 top-1/2 z-50 hidden -translate-y-1/2 md:flex md:flex-col md:items-center md:gap-1">
@@ -95,14 +98,25 @@ const DashboardNav = () => {
             </div>
           )}
           <button
-            onClick={() => {
-              signOut(auth);
-              router.push("/");
+            onClick={async () => {
+              if (isLoggingOut) return;
+              setIsLoggingOut(true);
+              try {
+                await signOut(auth);
+                toast.success("You have been logged out successfully.", { duration: 3000 });
+                await new Promise((resolve) => setTimeout(resolve, 1000));
+                router.push("/");
+              } catch (e) {
+                toast.error("Logout failed. Please try again.");
+              } finally {
+                setIsLoggingOut(false);
+              }
             }}
             className="p-2 text-muted-foreground/50 hover:text-red-500 transition-colors"
-            title="Logout"
+            title={isLoggingOut ? "Logging out..." : "Logout"}
+            aria-label={isLoggingOut ? "Logging out..." : "Logout"}
           >
-            <LogOut className="w-4 h-4" />
+            {isLoggingOut ? <Loader2 className="w-4 h-4 animate-spin" /> : <LogOut className="w-4 h-4" />}
           </button>
         </div>
       </div>

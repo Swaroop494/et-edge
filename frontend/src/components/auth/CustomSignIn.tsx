@@ -9,7 +9,15 @@ import { Eye, EyeOff, Loader2 } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
 import { auth } from "@/lib/firebase";
-import { signInWithEmailAndPassword, signInWithPopup, GoogleAuthProvider } from "firebase/auth";
+import {
+  signInWithEmailAndPassword,
+  signInWithPopup,
+  createUserWithEmailAndPassword,
+  updateProfile,
+  GoogleAuthProvider,
+  onAuthStateChanged,
+} from "firebase/auth";
+import { toast } from "@/components/ui/sonner";
 
 import {
   Form,
@@ -24,15 +32,22 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 
 const formSchema = z.object({
-  email: z.string().email({ message: "Invalid email address" }),
-  password: z.string().min(8, { message: "Password must be at least 8 characters" }),
+  email: z.string().nonempty({ message: "Email is required" }).email({ message: "Please enter a valid email address." }),
+  password: z.string().min(6, { message: "Password must be at least 6 characters" }),
+  confirmPassword: z.string().optional(),
   rememberMe: z.boolean().default(false).optional(),
-});
+}).refine((values) => {
+  if (values.confirmPassword === undefined) return true;
+  return values.confirmPassword === values.password;
+}, { message: "Passwords do not match", path: ["confirmPassword"] });
 
 export function CustomSignIn() {
   const router = useRouter();
+  const [mode, setMode] = React.useState<"signIn" | "signUp">("signIn");
   const [showPassword, setShowPassword] = React.useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = React.useState(false);
   const [isLoading, setIsLoading] = React.useState(false);
+  const [isSigningUp, setIsSigningUp] = React.useState(false);
   const [isGoogleLoading, setIsGoogleLoading] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
 
@@ -41,20 +56,61 @@ export function CustomSignIn() {
     defaultValues: {
       email: "",
       password: "",
+      confirmPassword: undefined,
       rememberMe: false,
     },
   });
 
+  React.useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (usr) => {
+      if (usr) router.replace("/dashboard");
+    });
+    return () => unsubscribe();
+  }, [router]);
+
+  const mapFirebaseError = (err: any, fallback: string) => {
+    const code = err?.code;
+    switch (code) {
+      case "auth/email-already-in-use":
+        return "An account with this email already exists. Please sign in instead.";
+      case "auth/invalid-email":
+        return "Please enter a valid email address.";
+      case "auth/weak-password":
+        return "Password is too weak. Use at least 6 characters.";
+      default:
+        return fallback;
+    }
+  };
+
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
-    setIsLoading(true);
     setError(null);
 
+    if (mode === "signUp") {
+      setIsSigningUp(true);
+      try {
+        const userCredential = await createUserWithEmailAndPassword(auth, values.email, values.password);
+        const prefix = values.email.split("@")[0] ?? values.email;
+        await updateProfile(userCredential.user, { displayName: prefix });
+
+        toast.success("Account created successfully! Welcome to ET Edge.", { duration: 3000 });
+        await new Promise((resolve) => setTimeout(resolve, 3000));
+        router.push("/dashboard");
+      } catch (err: any) {
+        console.error(err);
+        setError(mapFirebaseError(err, "Sign up failed. Please try again."));
+      } finally {
+        setIsSigningUp(false);
+      }
+      return;
+    }
+
+    setIsLoading(true);
     try {
       await signInWithEmailAndPassword(auth, values.email, values.password);
       router.push("/dashboard");
     } catch (err: any) {
       console.error(err);
-      setError(err.message || "Failed to sign in. Please check your credentials.");
+      setError(mapFirebaseError(err, "Sign in failed. Please try again."));
     } finally {
       setIsLoading(false);
     }
@@ -164,7 +220,8 @@ export function CustomSignIn() {
                       <FormLabel className="text-black font-medium text-[13px]">Email</FormLabel>
                       <FormControl>
                         <Input
-                          placeholder="Enter your email"
+                          type="email"
+                          placeholder={mode === "signUp" ? "Email address" : "Enter your email"}
                           className="bg-[#F7F7F9] border-0 rounded-xl h-12 px-4 shadow-none focus-visible:ring-1 focus-visible:ring-black/20 text-[14px] text-black placeholder:text-gray-400"
                           {...field}
                         />
@@ -184,7 +241,7 @@ export function CustomSignIn() {
                         <div className="relative">
                           <Input
                             type={showPassword ? "text" : "password"}
-                            placeholder="Enter your password"
+                            placeholder={mode === "signUp" ? "Password" : "Enter your password"}
                             className="bg-[#F7F7F9] border-0 rounded-xl h-12 px-4 shadow-none focus-visible:ring-1 focus-visible:ring-black/20 text-[14px] text-black pr-10 placeholder:text-gray-400"
                             {...field}
                           />
@@ -206,41 +263,100 @@ export function CustomSignIn() {
                   )}
                 />
 
-                <div className="flex items-center justify-between pt-1 pb-2">
+                {mode === "signUp" ? (
                   <FormField
                     control={form.control}
-                    name="rememberMe"
+                    name="confirmPassword"
                     render={({ field }) => (
-                      <FormItem className="flex flex-row items-center space-x-2 space-y-0">
+                      <FormItem>
+                        <FormLabel className="text-black font-medium text-[13px]">Confirm Password</FormLabel>
                         <FormControl>
-                          <Checkbox
-                            checked={field.value}
-                            onCheckedChange={field.onChange}
-                            className="border-gray-300 rounded-[4px] data-[state=checked]:bg-black data-[state=checked]:border-black"
-                          />
+                          <div className="relative">
+                            <Input
+                              type={showConfirmPassword ? "text" : "password"}
+                              placeholder="Confirm password"
+                              className="bg-[#F7F7F9] border-0 rounded-xl h-12 px-4 shadow-none focus-visible:ring-1 focus-visible:ring-black/20 text-[14px] text-black pr-10 placeholder:text-gray-400"
+                              {...field}
+                            />
+                            <button
+                              type="button"
+                              onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                              className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 focus:outline-none"
+                            >
+                              {showConfirmPassword ? (
+                                <EyeOff className="h-4 w-4" />
+                              ) : (
+                                <Eye className="h-4 w-4" />
+                              )}
+                            </button>
+                          </div>
                         </FormControl>
-                        <label className="text-[13px] text-gray-500 font-medium cursor-pointer">
-                          Remember me
-                        </label>
+                        <FormMessage className="text-xs" />
                       </FormItem>
                     )}
                   />
-                  <Link
-                    href="/forgot-password"
-                    className="text-[13px] text-gray-500 font-medium hover:text-black transition-colors"
-                  >
-                    Forgot Password
-                  </Link>
-                </div>
+                ) : (
+                  <div className="flex items-center justify-between pt-1 pb-2">
+                    <FormField
+                      control={form.control}
+                      name="rememberMe"
+                      render={({ field }) => (
+                        <FormItem className="flex flex-row items-center space-x-2 space-y-0">
+                          <FormControl>
+                            <Checkbox
+                              checked={field.value}
+                              onCheckedChange={field.onChange}
+                              className="border-gray-300 rounded-[4px] data-[state=checked]:bg-black data-[state=checked]:border-black"
+                            />
+                          </FormControl>
+                          <label className="text-[13px] text-gray-500 font-medium cursor-pointer">
+                            Remember me
+                          </label>
+                        </FormItem>
+                      )}
+                    />
+                    <Link
+                      href="/forgot-password"
+                      className="text-[13px] text-gray-500 font-medium hover:text-black transition-colors"
+                    >
+                      Forgot Password
+                    </Link>
+                  </div>
+                )}
 
                 <div className="space-y-4 pt-2">
-                  <Button
-                    type="submit"
-                    disabled={isLoading}
-                    className="w-full bg-black text-white hover:bg-black/90 h-12 rounded-xl text-[14px] font-semibold tracking-wide"
-                  >
-                    {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Sign In"}
-                  </Button>
+                  {mode === "signUp" ? (
+                    <Button
+                      type="submit"
+                      variant="outline"
+                      disabled={isSigningUp}
+                      className="w-full bg-white text-black border-gray-200 hover:bg-gray-50 h-12 rounded-xl text-[14px] font-semibold tracking-wide flex items-center justify-center gap-2"
+                    >
+                      {isSigningUp ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Signing up...
+                        </>
+                      ) : (
+                        "Sign Up"
+                      )}
+                    </Button>
+                  ) : (
+                    <Button
+                      type="submit"
+                      disabled={isLoading}
+                      className="w-full bg-black text-white hover:bg-black/90 h-12 rounded-xl text-[14px] font-semibold tracking-wide"
+                    >
+                      {isLoading ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Signing in...
+                        </>
+                      ) : (
+                        "Sign In"
+                      )}
+                    </Button>
+                  )}
 
                   <Button
                     type="button"
@@ -272,10 +388,47 @@ export function CustomSignIn() {
             {/* Footer */}
             <div className="mt-8 text-center">
               <span className="text-gray-500 text-[13px]">
-                Don't have an account?{" "}
-                <Link href="/sign-up" className="text-black font-semibold hover:underline">
-                  Sign Up
-                </Link>
+                {mode === "signIn" ? (
+                  <>
+                    Don't have an account?{" "}
+                    <button
+                      type="button"
+                      className="text-black font-semibold hover:underline"
+                      onClick={() => {
+                        setMode("signUp");
+                        setError(null);
+                        form.reset({
+                          email: form.getValues("email"),
+                          password: "",
+                          confirmPassword: undefined,
+                          rememberMe: false,
+                        });
+                      }}
+                    >
+                      Sign up
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    Already have an account?{" "}
+                    <button
+                      type="button"
+                      className="text-black font-semibold hover:underline"
+                      onClick={() => {
+                        setMode("signIn");
+                        setError(null);
+                        form.reset({
+                          email: form.getValues("email"),
+                          password: "",
+                          confirmPassword: undefined,
+                          rememberMe: false,
+                        });
+                      }}
+                    >
+                      Sign in
+                    </button>
+                  </>
+                )}
               </span>
             </div>
           </div>
