@@ -6,7 +6,6 @@ import { ArrowRight } from "lucide-react";
 import etEdgeLogo from "@/assets/et-edge-logo.png";
 import FloatingStockCards from "./FloatingStockCards";
 import MiniCharts from "./MiniCharts";
-import DataTicker from "./DataTicker";
 
 const RocketHero = () => {
   const router = useRouter();
@@ -241,8 +240,7 @@ const RocketHero = () => {
         </motion.button>
       </div>
 
-      {/* ── DATA TICKER ── */}
-      <DataTicker />
+
 
       {/* Vignette */}
       <div className="absolute inset-0 vignette-soft pointer-events-none" />
