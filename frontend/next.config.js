@@ -1,6 +1,15 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: false,
+  images: {
+    remotePatterns: [
+      { protocol: "https", hostname: "newsapi.org" },
+      { protocol: "https", hostname: "api.anthropic.com" },
+    ],
+  },
+  turbopack: {
+    root: process.cwd(),
+  },
   experimental: {
     optimizePackageImports: [
       "framer-motion",
@@ -12,9 +21,6 @@ const nextConfig = {
       "@radix-ui/react-tabs",
       "@radix-ui/react-tooltip",
     ],
-  },
-  images: {
-    domains: ["newsapi.org", "api.anthropic.com"],
   },
   async headers() {
     return [

@@ -3,6 +3,7 @@
 import { usePathname, useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { LayoutGrid, Radio, Brain, BarChart3, Video, Shield, GitFork, TrendingUp } from "lucide-react";
+import { UserButton } from "@clerk/nextjs";
 
 const moduleConfig = [
   { icon: LayoutGrid, label: "Dashboard", path: "/dashboard" },
@@ -83,6 +84,20 @@ const DashboardNav = () => {
             </motion.button>
           );
         })}
+        <div className="mt-auto pt-4 border-t border-border/20 flex items-center justify-center">
+          <UserButton
+            afterSignOutUrl="/"
+            appearance={{
+              elements: {
+                avatarBox: "w-8 h-8 rounded-xl",
+                userButtonPopoverCard: "bg-secondary/90 backdrop-blur-xl border border-border/30 rounded-2xl",
+                userButtonPopoverActionButton: "text-foreground hover:bg-secondary/60 rounded-xl",
+                userButtonPopoverActionButtonText: "text-foreground text-sm",
+                userButtonPopoverFooter: "hidden",
+              },
+            }}
+          />
+        </div>
       </div>
     </nav>
   );
