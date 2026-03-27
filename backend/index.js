@@ -7,6 +7,7 @@ const liveNewsRoute = require('./routes/liveNews');
 const analyzeEventRoute = require('./routes/analyzeEvent');
 const validateTipRoute = require('./routes/validateTip');
 const portfolioImpactRoute = require('./routes/portfolioImpact');
+const agentRoute = require('./routes/agent');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -26,6 +27,7 @@ app.use('/api/live-news', liveNewsRoute);
 app.use('/api/analyze-event', analyzeEventRoute);
 app.use('/api/validate-tip', validateTipRoute);
 app.use('/api/portfolio-impact', portfolioImpactRoute);
+app.use('/api/agent/run', agentRoute);
 
 app.listen(PORT, () => {
     console.log(`ET Edge Backend running on port ${PORT}`);
