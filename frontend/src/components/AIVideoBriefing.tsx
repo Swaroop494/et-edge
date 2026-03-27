@@ -1,8 +1,9 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { Play, ChevronDown, ChevronUp, Clock, Database, TrendingUp, AlertCircle, BarChart3 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import VideoReport from "./VideoReport";
 
 const highlights = [
   { icon: TrendingUp, text: "NIFTY opened gap-up at 22,847 — momentum sustained above 200 DMA" },
@@ -26,8 +27,22 @@ Key levels to watch: NIFTY support at 22,650 and resistance at 23,100. The AI mo
 Stay informed. Stay ahead.`;
 
 const AIVideoBriefing = () => {
-  const [isPlaying, setIsPlaying] = useState(false);
   const [scriptOpen, setScriptOpen] = useState(false);
+  const [marketData, setMarketData] = useState<any>(null);
+
+  useEffect(() => {
+    // Load data from localStorage (populated by AgentRunner or Detector)
+    const eventAnalysis = localStorage.getItem("et_edge_event_analysis");
+    const portfolioResult = localStorage.getItem("et_edge_portfolio_result");
+    
+    if (eventAnalysis || portfolioResult) {
+      setMarketData({
+        event: eventAnalysis ? JSON.parse(eventAnalysis) : null,
+        portfolio: portfolioResult ? JSON.parse(portfolioResult) : null,
+        timestamp: new Date().toISOString()
+      });
+    }
+  }, []);
 
   return (
     <section className="relative min-h-screen overflow-hidden px-6 py-24 md:px-10 lg:px-16">
@@ -61,61 +76,14 @@ const AIVideoBriefing = () => {
         </div>
 
         <div className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
-          {/* Video player card */}
+          {/* Dynamic Video Pipeline Component */}
           <motion.div
             initial={{ opacity: 0, y: 20, filter: "blur(10px)" }}
             whileInView={{ opacity: 1, y: 0, filter: "blur(0px)" }}
             viewport={{ once: true, amount: 0.3 }}
             transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
-            className="glass-strong rounded-[2rem] p-2 relative group"
           >
-            {/* Video thumbnail */}
-            <div
-              className="relative w-full rounded-[1.75rem] overflow-hidden"
-              style={{ aspectRatio: "16/9" }}
-            >
-              <div className="absolute inset-0 bg-gradient-to-br from-deep-purple/60 via-midnight/80 to-teal/30" />
-              <div className="absolute inset-0 bg-gradient-to-t from-background/80 via-transparent to-transparent" />
-
-              {/* Grid overlay */}
-              <div className="absolute inset-0 opacity-[0.04]" style={{
-                backgroundImage: "linear-gradient(hsl(var(--foreground)) 1px, transparent 1px), linear-gradient(90deg, hsl(var(--foreground)) 1px, transparent 1px)",
-                backgroundSize: "40px 40px"
-              }} />
-
-              {/* Center content */}
-              <div className="absolute inset-0 flex flex-col items-center justify-center gap-4">
-                <motion.button
-                  onClick={() => setIsPlaying(!isPlaying)}
-                  whileHover={{ scale: 1.08 }}
-                  whileTap={{ scale: 0.95 }}
-                  className="relative flex h-20 w-20 items-center justify-center rounded-full glass-strong"
-                >
-                  {/* Pulse ring */}
-                  <motion.span
-                    className="absolute inset-[-6px] rounded-full border border-accent/25"
-                    animate={{ scale: [1, 1.3, 1], opacity: [0.4, 0, 0.4] }}
-                    transition={{ duration: 2.5, repeat: Infinity, ease: "easeInOut" }}
-                  />
-                  <motion.span
-                    className="absolute inset-[-12px] rounded-full border border-accent/10"
-                    animate={{ scale: [1, 1.4, 1], opacity: [0.2, 0, 0.2] }}
-                    transition={{ duration: 2.5, repeat: Infinity, ease: "easeInOut", delay: 0.3 }}
-                  />
-                  <Play className="w-7 h-7 text-accent ml-1" fill="hsl(var(--accent) / 0.3)" />
-                </motion.button>
-
-                <div className="text-center">
-                  <p className="font-display text-lg text-foreground">Daily AI Market Brief</p>
-                  <div className="flex items-center justify-center gap-2 mt-2 text-text-secondary text-xs">
-                    <Clock className="w-3 h-3" />
-                    <span>~60 seconds</span>
-                    <span className="text-border">·</span>
-                    <span>Mar 20, 2026</span>
-                  </div>
-                </div>
-              </div>
-            </div>
+            <VideoReport data={marketData} />
           </motion.div>
 
           {/* Highlights + details panel */}
