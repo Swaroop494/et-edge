@@ -8,6 +8,9 @@ import StockChart from "@/components/dashboard/StockChart";
 import EventHighlights from "@/components/dashboard/EventHighlights";
 import LearningLoop from "@/components/dashboard/LearningLoop";
 import FeatureCards from "@/components/dashboard/FeatureCards";
+import dynamic from "next/dynamic";
+const AgentRunner = dynamic(() => import("@/components/AgentRunner"), { ssr: false });
+
 
 const Dashboard = () => {
   const router = useRouter();
@@ -60,6 +63,9 @@ const Dashboard = () => {
       <footer className="relative z-10 border-t border-border/20 py-12 text-center">
         <p className="text-text-secondary text-xs">© 2026 ET Edge. Event-driven AI intelligence for Indian markets.</p>
       </footer>
+      <div className="px-6 pb-16 md:px-10 lg:px-16 max-w-7xl mx-auto mt-8">
+        <AgentRunner />
+      </div>
     </div>
   );
 };

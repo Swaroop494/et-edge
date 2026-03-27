@@ -73,3 +73,17 @@ export async function portfolioImpact(userHoldings, eventAnalysis) {
     return null;
   }
 }
+
+export async function runAgent(userHoldings, tip) {
+  try {
+    const response = await fetch(`${API_BASE}/agent/run`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userHoldings: userHoldings || [], tip: tip || '' }),
+    });
+    return await response.json();
+  } catch (error) {
+    console.error('runAgent error:', error);
+    return null;
+  }
+}
