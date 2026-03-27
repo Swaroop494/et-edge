@@ -1,55 +1,174 @@
-// ET Edge — Validate Tip Route. The Finfluencer BS Detector. Accepts stock tip + news context, returns validity analysis.
+// ET Edge — Validate Tip Route with real market grounding.
 const express = require('express');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
+const { getStockData } = require('../services/stockData');
+const { extractTicker } = require('../services/extractTicker');
+const { fetchNewsContext } = require('../services/newsGrounding');
+
 const router = express.Router();
 
-const buildMockValidation = (tipText) => {
-  return {
-    validityScore: 45,
-    verdict: "Misleading",
-    reasoning: "The tip uses urgent language typical of social media pumping schemes. While the stock exists, there is no verifiable news context to support the specific target price mentioned.",
-    redFlags: ["Urgent language", "Unverified price target", "Source uncertainty"],
-    positiveSignals: ["Company is listed on NSE"]
-  };
-};
-
-router.post('/', async (req, res) => {
+router.post('/', async (req, res, next) => {
   try {
-    const tip = req.body.tip || req.body.tipText;
-    const newsContext = req.body.newsContext || "No context provided";
-
-    if (!tip) {
-      return res.status(400).json({ error: 'tip is required' });
+    const tipText = req.body.tipText || req.body.tip;
+    if (!tipText || typeof tipText !== 'string') {
+      return res.status(400).json({ error: 'tipText is required' });
     }
 
-    let parsedResponse;
-    try {
-      const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-      const model = genAI.getGenerativeModel({ 
-        model: 'gemini-2.5-flash-lite',
-        systemInstruction: 'You are a financial fraud detector protecting Indian retail investors. You only respond in valid JSON with no additional text or markdown outside the JSON. Analyze tips for misinformation, pumping schemes, or verified facts. Cross-reference every claim in the tip against available news context.'
-      });
+    const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+    const flashModel = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
+    const proModel = genAI.getGenerativeModel({ model: 'gemini-1.5-pro' });
 
-      const prompt = `You are a financial fraud detector. Analyze this tip: "${tip}". Cross-reference it with the latest live news. Today's news context: ${newsContext}. Return ONLY a valid JSON object with exactly these fields — score: number 0-100 where 100 is completely verified true and 0 is fake, verdict: string exactly one of Valid or Misleading or Noise, reason: string 2 to 3 plain English sentences explaining your verdict.`;
+    // Step 3c — extract ticker
+    const ticker = await extractTicker(flashModel, tipText);
 
-      const result = await model.generateContent(prompt);
-      const text = result.response.text();
-      const cleanedText = text.replace(/```json/g, '').replace(/```/g, '').trim();
-      parsedResponse = JSON.parse(cleanedText);
-    } catch (aiErr) {
-      console.error("Gemini tip validation failed, using mock fallback:", aiErr.message);
-      parsedResponse = {
-        score: 45,
-        verdict: "Misleading",
-        reason: "The system is currently in diagnostic mode. This tip exhibits patterns commonly associated with social media speculation."
-      };
+    let stockData = null;
+    let groundingContext = '';
+    let newsContext = '';
+
+    if (ticker === 'NONE') {
+      groundingContext =
+        'No specific NSE/BSE stock ticker could be extracted from this claim. The tip cannot be directly tied to a verifiable listed company.';
+      newsContext =
+        'No ticker-specific news. Provide only general reasoning based on the language and structure of the claim.';
+    } else {
+      // Step 3e — fetch stock grounding
+      stockData = await getStockData(ticker);
+
+      if (!stockData.valid) {
+        return res.status(200).json({
+          validityScore: 0,
+          verdict: 'Invalid',
+          reasoning: `"${ticker}" does not exist on NSE or BSE. This is a fabricated company or typo.`,
+          redFlags: [
+            'Stock does not exist on any Indian exchange',
+            'Possible pump-and-dump on fake asset',
+          ],
+          positiveSignals: [],
+          claimedPriceTarget: null,
+          targetRealistic: null,
+          stockData: null,
+        });
+      }
+
+      const {
+        currentPrice,
+        previousClose,
+        fiftyTwoWeekHigh,
+        fiftyTwoWeekLow,
+        marketCap,
+        currency,
+        signals,
+        meta,
+      } = stockData;
+
+      groundingContext = [
+        `Ticker: ${ticker}`,
+        `Exchange symbol: ${meta.exchangeSymbol}`,
+        `Company: ${meta.companyName}`,
+        `Current price: ${currentPrice} ${currency}`,
+        previousClose != null ? `Previous close: ${previousClose} ${currency}` : null,
+        fiftyTwoWeekHigh != null
+          ? `52-week high: ${fiftyTwoWeekHigh} ${currency}`
+          : null,
+        fiftyTwoWeekLow != null
+          ? `52-week low: ${fiftyTwoWeekLow} ${currency}`
+          : null,
+        marketCap != null ? `Market cap: ${marketCap}` : null,
+        signals.return3m != null
+          ? `3M return: ${signals.return3m.toFixed(2)}%`
+          : null,
+        signals.volatility != null
+          ? `Annualised volatility: ${(signals.volatility * 100).toFixed(2)}%`
+          : null,
+        signals.trend ? `Trend: ${signals.trend}` : null,
+        signals.rsiProxy != null
+          ? `RSI proxy: ${signals.rsiProxy.toFixed(2)}`
+          : null,
+        signals.distanceFrom52wHigh != null
+          ? `Distance from 52W high: ${signals.distanceFrom52wHigh.toFixed(2)}%`
+          : null,
+        signals.momentum10d != null
+          ? `10-day momentum: ${signals.momentum10d.toFixed(2)}%`
+          : null,
+        signals.avgVolume3m != null
+          ? `Average daily volume (3M): ${Math.round(signals.avgVolume3m)}`
+          : null,
+      ]
+        .filter(Boolean)
+        .join('\n');
+
+      // Step 3f — recent news using Gemini web_search tool
+      newsContext = await fetchNewsContext(
+        proModel,
+        ticker,
+        meta.companyName || ticker
+      );
     }
 
-    return res.status(200).json(parsedResponse);
+    const prompt = `
+You are a SEBI-aware financial fact-checker. Your job: detect finfluencer manipulation.
+
+LIVE MARKET DATA (do not contradict these numbers):
+${groundingContext}
+
+RECENT NEWS:
+${newsContext}
+
+CLAIM: "${tipText}"
+
+Red flag rules — apply automatically:
+- Claim price target exceeds 52W high by >20%: automatic redFlag
+- Claim says guaranteed/sure/100%: automatic redFlag  
+- Stock in downtrend + claim says buy: automatic redFlag
+- RSI proxy > 75 + claim says buy more: automatic redFlag (overbought)
+- volatility > 60% annualised: add to redFlags as 'Highly volatile stock'
+- momentum10d < -5% + bullish claim: add redFlag 'Negative near-term momentum'
+
+Score guidance:
+- 80-100: Claim is consistent with all market data and trends
+- 60-79: Claim has some basis but uses hype language or mild overstatement
+- 40-59: Claim contradicts some signals or lacks evidence
+- 20-39: Claim contradicts majority of signals, urgent/emotional language
+- 0-19: No basis in data, fake urgency, or impossible price target
+
+Respond ONLY in this JSON, no markdown fences, no extra text:
+{
+  "validityScore": <0-100>,
+  "verdict": <"Valid"|"Misleading"|"Hype"|"Invalid"|"Noise">,
+  "reasoning": "<2-3 sentences, must reference at least one specific number from the live data>",
+  "redFlags": ["<specific flag with data reference>"],
+  "positiveSignals": ["<specific signal>"],
+  "claimedPriceTarget": <number or null>,
+  "targetRealistic": <true|false|null>
+}
+`.trim();
+
+    const result = await proModel.generateContent({
+      contents: [{ role: 'user', parts: [{ text: prompt }] }],
+      tools: [{ googleSearch: {} }],
+    });
+
+    const raw = result.response.text();
+    const cleaned = raw.replace(/```json/g, '').replace(/```/g, '').trim();
+    const parsed = JSON.parse(cleaned);
+
+    if (ticker === 'NONE' && typeof parsed.validityScore === 'number') {
+      parsed.validityScore = Math.min(parsed.validityScore, 40);
+    }
+
+    if (stockData && stockData.valid) {
+      // Strip internal historical meta before returning to client
+      const { meta, ...publicStock } = stockData;
+      parsed.stockData = publicStock;
+    } else {
+      parsed.stockData = null;
+    }
+
+    return res.status(200).json(parsed);
   } catch (err) {
-    console.error("Validate tip route error:", err);
-    return res.status(500).json({ error: "Internal server error" });
+    return next(err);
   }
 });
 
 module.exports = router;
+

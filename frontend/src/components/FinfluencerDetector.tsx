@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { GoogleGenerativeAI } from "@google/generative-ai";
 import { motion, AnimatePresence } from "framer-motion";
 import { z } from "zod";
 import { AlertTriangle, ShieldCheck, Siren } from "lucide-react";
@@ -98,35 +97,15 @@ const FinfluencerDetector = ({ eventId }: FinfluencerDetectorProps) => {
           .map((item, index) => `${index + 1}. ${item?.title ?? ""}`)
           .join(" ");
 
-        let result;
-        try {
-          result = await validateTip(parsed.data, formattedHeadlines);
-        } catch (backendErr) {
-          console.warn("Backend validation failed, trying local Gemini logic...");
+        const result = await validateTip(parsed.data, formattedHeadlines);
+        if (result?.error) {
+          throw new Error(result.error);
         }
-
-        if (result && !result.error) {
-          setValidationResult(result);
-        } else {
-          // Task 2: Local Gemini Path
-          const genAI = new GoogleGenerativeAI(process.env.NEXT_PUBLIC_GEMINI_API_KEY || "");
-          const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash-latest" });
-          
-          const prompt = `You are a financial fraud detector. Analyze this tip: "${parsed.data}". Cross-reference it with the latest live news: ${formattedHeadlines}. Return ONLY a valid JSON object: { "score": 0-100, "verdict": "Valid/Misleading/Noise", "reason": "..." }. Use 2 simple sentences for reason.`;
-          
-          const aiResult = await model.generateContent(prompt);
-          const rawText = aiResult.response.text();
-          const cleanJson = rawText.replace(/```json|```/gi, "").trim();
-          setValidationResult(JSON.parse(cleanJson));
-        }
+        setValidationResult(result);
       } catch (err) {
-        console.error("Local fallback failed:", err);
-        // Emergency Mock if everything totally breaks
-        setValidationResult({
-          score: 50,
-          verdict: "Noise",
-          reason: "Analysis currently limited. Be cautious of unverified claims during high volatility."
-        });
+        console.error("validateTip failed:", err);
+        setError(err instanceof Error ? err.message : "Tip validation failed.");
+        setValidationResult(null);
       } finally {
         setIsLoading(false);
       }

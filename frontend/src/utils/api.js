@@ -52,11 +52,39 @@ export async function validateTip(tipText, newsContext) {
       headers,
       body: JSON.stringify({ tipText, newsContext }),
     });
+    const contentType = response.headers.get("content-type") || "";
+    if (!response.ok) {
+      const text = await response.text().catch(() => "");
+      throw new Error(`validateTip failed (${response.status}): ${text || response.statusText}`);
+    }
+    if (!contentType.includes("application/json")) {
+      const text = await response.text().catch(() => "");
+      throw new Error(`validateTip returned non-JSON: ${text.slice(0, 120)}`);
+    }
     return await response.json();
   } catch (error) {
     console.error("validateTip error:", error);
-    return null;
+    throw error;
   }
+}
+
+export async function runWhatIfScenario(scenarioText) {
+  const headers = await getAuthHeaders();
+  const response = await fetch(`${API_BASE}/what-if`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({ scenarioText }),
+  });
+  const contentType = response.headers.get("content-type") || "";
+  if (!response.ok) {
+    const text = await response.text().catch(() => "");
+    throw new Error(`whatIf failed (${response.status}): ${text || response.statusText}`);
+  }
+  if (!contentType.includes("application/json")) {
+    const text = await response.text().catch(() => "");
+    throw new Error(`whatIf returned non-JSON: ${text.slice(0, 120)}`);
+  }
+  return await response.json();
 }
 
 export async function portfolioImpact(userHoldings, eventAnalysis) {
