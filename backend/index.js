@@ -9,6 +9,9 @@ const validateTipRoute = require('./routes/validateTip');
 const whatIfRoute = require('./routes/whatIf');
 const portfolioImpactRoute = require('./routes/portfolioImpact');
 const agentRoute = require('./routes/agent');
+const bulkDealAgentRoute = require('./routes/bulkDealAgent');
+const technicalAgentRoute = require('./routes/technicalAgent');
+const portfolioNewsAgentRoute = require('./routes/portfolioNewsAgent');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -30,6 +33,9 @@ app.use('/api/validate-tip', validateTipRoute);
 app.use('/api/what-if', whatIfRoute);
 app.use('/api/portfolio-impact', portfolioImpactRoute);
 app.use('/api/agent/run', agentRoute);
+app.use('/api/agent/bulk-deal', bulkDealAgentRoute);
+app.use('/api/agent/technical', technicalAgentRoute);
+app.use('/api/agent/portfolio-news', portfolioNewsAgentRoute);
 
 // Central error handler — always JSON (agent runner contract)
 // Do not swallow errors; surface real messages.
