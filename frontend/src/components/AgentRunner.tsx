@@ -17,7 +17,10 @@ const STEPS = [
 ];
 
 const AgentRunner = () => {
-  const [holdings, setHoldings] = useState("HDFCBANK, SBIN, TCS");
+  const [holdings, setHoldings] = useState(() => {
+    if (typeof window === 'undefined') return "HDFCBANK, SBIN, TCS";
+    return localStorage.getItem("et_edge_user_holdings") || "HDFCBANK, SBIN, TCS";
+  });
   const [tip, setTip] = useState("");
   const [isRunning, setIsRunning] = useState(false);
   const [result, setResult] = useState<any | null>(null);
@@ -30,6 +33,7 @@ const AgentRunner = () => {
     setError(null);
     setActiveStep(1);
     const holdingsArray = holdings.split(",").map((h) => h.trim()).filter(Boolean);
+    localStorage.setItem("et_edge_user_holdings", holdings);
     const stepTimer = (step: number) => new Promise((resolve) => setTimeout(() => { setActiveStep(step); resolve(null); }, step * 1800));
     const [agentResult] = await Promise.all([
       runAgent(holdingsArray, tip),
@@ -107,6 +111,12 @@ const AgentRunner = () => {
         {result && (
           <motion.div initial={{ opacity: 0, y: 16, filter: "blur(8px)" }} animate={{ opacity: 1, y: 0, filter: "blur(0px)" }} exit={{ opacity: 0 }} transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }} className="space-y-4">
             <p className="text-xs uppercase tracking-[0.28em] text-text-secondary">Agent summary</p>
+            {result.outputs?.eventAnalysis?.actionableAlert && (
+              <div className="rounded-[1.5rem] border border-accent/30 bg-accent/5 p-5">
+                <p className="text-xs uppercase tracking-[0.24em] text-accent mb-2">Actionable Alert</p>
+                <p className="text-sm leading-7 text-foreground">{result.outputs.eventAnalysis.actionableAlert}</p>
+              </div>)
+            }
             <div className="rounded-[1.5rem] border border-border/30 bg-secondary/20 p-5">
               <p className="text-sm leading-7 text-foreground">{result.outputs?.agentSummary}</p>
             </div>
