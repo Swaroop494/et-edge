@@ -14,6 +14,7 @@ const technicalAgentRoute = require('./routes/technicalAgent');
 const portfolioNewsAgentRoute = require('./routes/portfolioNewsAgent');
 const marketGptRoute = require('./routes/marketGpt');
 const learningLoopRoute = require('./routes/learningLoop');
+const dashboardRoute = require('./routes/dashboard');
 
 
 
@@ -42,6 +43,7 @@ app.use('/api/agent/technical', technicalAgentRoute);
 app.use('/api/agent/portfolio-news', portfolioNewsAgentRoute);
 app.use('/api/market-gpt', marketGptRoute);
 app.use('/api/learning', learningLoopRoute);
+app.use('/api/dashboard', dashboardRoute);
 
 
 
