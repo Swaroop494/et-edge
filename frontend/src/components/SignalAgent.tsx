@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { CheckCircle2, Circle, Loader2, AlertTriangle, TrendingUp, BarChart3 } from "lucide-react";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api";
+import { API_BASE } from "@/lib/api";
 
 const TABS = [
   { id: "bulk", label: "Bulk Deal Filing", icon: AlertTriangle, description: "Promoter sold 4.2% stake at 6% discount — distress or routine?" },
@@ -150,7 +150,7 @@ const SignalAgent = () => {
   useEffect(() => {
     const fetchStats = async () => {
       try {
-        const response = await fetch(`${API_BASE}/learning/stats`);
+        const response = await fetch(`${API_BASE}/api/learning/stats`);
         if (response.ok) {
           const data = await response.json();
           setVerificationDepth(data.verificationDepth || 1);
@@ -163,9 +163,9 @@ const SignalAgent = () => {
   }, []);
 
   const endpointMap: Record<string, string> = {
-    bulk: `${API_BASE}/agent/bulk-deal`,
-    technical: `${API_BASE}/agent/technical`,
-    portfolio: `${API_BASE}/agent/portfolio-news`,
+    bulk: `${API_BASE}/api/agent/bulk-deal`,
+    technical: `${API_BASE}/api/agent/technical`,
+    portfolio: `${API_BASE}/api/agent/portfolio-news`,
   };
 
   const handleRun = async () => {

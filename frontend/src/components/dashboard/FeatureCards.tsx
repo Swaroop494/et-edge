@@ -1,17 +1,19 @@
 "use client";
 
+import { useState } from "react";
 import { motion } from "framer-motion";
 import { Zap, Brain, TrendingUp, Shield, Eye, Video, BarChart3 } from "lucide-react";
 import { useRouter } from "next/navigation";
 
-const summaryCards = [
-  { icon: Zap, title: "Event Intelligence", stat: "12", statLabel: "live events", status: "Live", fill: 52, route: "/events" },
-  { icon: Brain, title: "Explainability", stat: "76%", statLabel: "confidence avg", status: "AI Active", fill: 76, route: "/explain" },
-  { icon: BarChart3, title: "Portfolio Impact", stat: "3", statLabel: "stocks at risk", status: "Monitoring", fill: 40, route: "/impact" },
-  { icon: Video, title: "AI Video Brief", stat: "1", statLabel: "daily brief", status: "Ready", fill: 100, route: "/video" },
-  { icon: Shield, title: "Finfluencer Detector", stat: "89%", statLabel: "accuracy rate", status: "Ready", fill: 89, route: "/detector" },
-  { icon: Eye, title: "What-if Engine", stat: "5", statLabel: "scenarios", status: "Active", fill: 64, route: "/whatif" },
-  { icon: TrendingUp, title: "Learning Loop", stat: "76%", statLabel: "AI accuracy", status: "Improving", fill: 76, route: "/learning" },
+// TODO: wire to /api/agent/status when route is available
+const INITIAL_CARDS = [
+  { icon: Zap,       title: "Event Intelligence",    stat: "12",  statLabel: "live events",     status: "Live",       fill: 52,  route: "/events"   },
+  { icon: Brain,     title: "Explainability",         stat: "76%", statLabel: "confidence avg",  status: "AI Active",  fill: 76,  route: "/explain"  },
+  { icon: BarChart3, title: "Portfolio Impact",       stat: "3",   statLabel: "stocks at risk",  status: "Monitoring", fill: 40,  route: "/impact"   },
+  { icon: Video,     title: "AI Video Brief",         stat: "1",   statLabel: "daily brief",     status: "Ready",      fill: 100, route: "/video"    },
+  { icon: Shield,    title: "Finfluencer Detector",   stat: "89%", statLabel: "accuracy rate",   status: "Ready",      fill: 89,  route: "/detector" },
+  { icon: Eye,       title: "What-if Engine",         stat: "5",   statLabel: "scenarios",       status: "Active",     fill: 64,  route: "/whatif"   },
+  { icon: TrendingUp,title: "Learning Loop",          stat: "76%", statLabel: "AI accuracy",     status: "Improving",  fill: 76,  route: "/learning" },
 ];
 
 interface FeatureCardsProps {
@@ -20,10 +22,12 @@ interface FeatureCardsProps {
 
 const FeatureCards = ({ onNavigate }: FeatureCardsProps) => {
   const router = useRouter();
+  // State-managed so live stats from /api/agent/status can be wired in later
+  const [cards] = useState(INITIAL_CARDS);
 
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7 gap-4">
-      {summaryCards.map((card, i) => (
+      {cards.map((card, i) => (
         <motion.button
           key={card.title}
           initial={{ opacity: 0, y: 20, filter: "blur(4px)" }}

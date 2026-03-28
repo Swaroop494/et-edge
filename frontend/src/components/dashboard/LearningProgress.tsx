@@ -2,35 +2,38 @@
 
 import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { API_BASE } from "@/lib/api";
 import { BrainCircuit, Zap, CheckCircle2, TrendingUp, Info } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 
+// Mock fallback values — shown when API is unreachable
+const MOCK_STATS = { accuracy: 76, totalLogs: 0, latestLesson: "Calibrating real-time accuracy...", isImproving: false };
+
 const LearningProgress = () => {
-  const [stats, setStats] = useState({
-    accuracy: 76,
-    totalLogs: 0,
-    latestLesson: "Calibrating real-time accuracy...",
-    isImproving: false
-  });
+  const [stats, setStats] = useState(MOCK_STATS);
   const [isLoading, setIsLoading] = useState(true);
+  const [usingFallback, setUsingFallback] = useState(false);
 
   useEffect(() => {
     const fetchStats = async () => {
       try {
-        const response = await fetch("http://localhost:5000/api/learning/stats");
+        const response = await fetch(`${API_BASE}/api/learning/stats`);
         if (response.ok) {
           const data = await response.json();
           setStats(data);
+          setUsingFallback(false);
+        } else {
+          setUsingFallback(true);
         }
       } catch (error) {
         console.error("Error fetching learning stats:", error);
+        setUsingFallback(true);
       } finally {
         setIsLoading(false);
       }
     };
 
     fetchStats();
-    // Refresh every 30 seconds for live feedback
     const interval = setInterval(fetchStats, 30000);
     return () => clearInterval(interval);
   }, []);
@@ -66,6 +69,9 @@ const LearningProgress = () => {
           <div className="flex items-center gap-1 justify-end text-[9px] text-accent">
             <TrendingUp size={10} /> {stats.totalLogs} logs
           </div>
+          {usingFallback && (
+            <p className="text-[9px] text-warning/70 mt-0.5">demo data</p>
+          )}
         </div>
       </div>
 

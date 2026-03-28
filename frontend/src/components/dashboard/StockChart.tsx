@@ -1,8 +1,10 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
+import type { DashData } from "@/page-components/Dashboard";
 
-const stockData = {
+// ── Mock fallback data ──────────────────────────────────────────────────────
+const MOCK: Record<string, { t: string; v: number }[]> = {
   "1D": [
     { t: "9:15", v: 2812 }, { t: "9:45", v: 2824 }, { t: "10:15", v: 2838 },
     { t: "10:45", v: 2831 }, { t: "11:15", v: 2847 }, { t: "11:45", v: 2842 },
@@ -18,11 +20,32 @@ const stockData = {
     { t: "W4", v: 2847 },
   ],
 };
+// ────────────────────────────────────────────────────────────────────────────
 
 const ranges = ["1D", "1W", "1M"] as const;
+type Range = typeof ranges[number];
 
-const StockChart = () => {
-  const [range, setRange] = useState<keyof typeof stockData>("1D");
+interface StockChartProps {
+  dashData: DashData | null;
+}
+
+const StockChart = ({ dashData }: StockChartProps) => {
+  const [range, setRange] = useState<Range>("1D");
+  const isLive = dashData !== null;
+
+  const price     = isLive ? dashData.reliance.price     : 2847.35;
+  const changePct = isLive ? dashData.reliance.changePct : 1.24;
+  const isUp      = changePct >= 0;
+
+  const liveCharts: Record<Range, { t: string; v: number }[]> = {
+    "1D": (dashData?.reliance.chartData ?? []).map((p) => ({ t: p.time, v: p.price })),
+    "1W": (dashData?.reliance.chartWeekly ?? []).map((p) => ({ t: p.time, v: p.price })),
+    "1M": (dashData?.reliance.chartMonthly ?? []).map((p) => ({ t: p.time, v: p.price })),
+  };
+
+  const chartPoints = isLive
+    ? (liveCharts[range].length > 0 ? liveCharts[range] : MOCK[range])
+    : MOCK[range];
 
   return (
     <motion.div
@@ -37,9 +60,14 @@ const StockChart = () => {
             RELIANCE
           </h3>
           <div className="flex items-baseline gap-2 mt-1">
-            <span className="font-display text-xl font-bold text-foreground tabular-nums">₹2,847.35</span>
-            <span className="text-xs font-medium text-accent tabular-nums">+1.24%</span>
+            <span className="font-display text-xl font-bold text-foreground tabular-nums">
+              ₹{Number(price).toLocaleString("en-IN", { maximumFractionDigits: 2 })}
+            </span>
+            <span className={`text-xs font-medium tabular-nums ${isUp ? "text-accent" : "text-critical"}`}>
+              {isUp ? "+" : ""}{changePct.toFixed(2)}%
+            </span>
           </div>
+          {!isLive && <p className="text-[9px] text-warning/70 mt-0.5">demo data</p>}
         </div>
         <div className="flex gap-1 p-0.5 rounded-lg bg-secondary/50">
           {ranges.map((r) => (
@@ -67,7 +95,7 @@ const StockChart = () => {
           className="h-36"
         >
           <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={stockData[range]}>
+            <AreaChart data={chartPoints}>
               <defs>
                 <linearGradient id="relianceGrad" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="0%" stopColor="hsl(258,78%,55%)" stopOpacity={0.3} />
