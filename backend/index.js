@@ -42,11 +42,8 @@ app.use('/api/agent/technical', technicalAgentRoute);
 app.use('/api/agent/portfolio-news', portfolioNewsAgentRoute);
 app.use('/api/market-gpt', marketGptRoute);
 app.use('/api/learning', learningLoopRoute);
-<<<<<<< HEAD
-app.use('/api/dashboard', dashboardRoute);
-=======
 app.use('/api/scenarios', scenariosRoute);
->>>>>>> b8c5330a8ad427a718bd17645e9365dcd73dac3c
+app.use('/api/dashboard', dashboardRoute);
 
 
 
