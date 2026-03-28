@@ -61,7 +61,7 @@ app.use((err, req, res, next) => {
     return next(err);
 });
 
-app.listen(PORT, () => {
+app.listen(PORT, '0.0.0.0', () => {
     console.log(`ET Edge Backend running on port ${PORT}`);
     console.log(`News fetch interval set to ${NEWS_FETCH_INTERVAL_MS}ms`);
 });
