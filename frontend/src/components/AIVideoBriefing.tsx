@@ -45,9 +45,10 @@ const AIVideoBriefing = () => {
   }, []);
 
   return (
-    <section className="relative min-h-screen overflow-hidden px-6 py-24 md:px-10 lg:px-16">
-      <div className="absolute inset-0 gradient-video" />
+    <section className="relative min-h-screen max-w-[100vw] overflow-x-hidden px-4 md:px-10 lg:px-16 py-16 md:py-24">
+      <div className="absolute inset-0 gradient-video bg-fixed" />
       <div className="absolute inset-0 vignette-soft pointer-events-none" />
+      
       <div className="absolute inset-0 pointer-events-none">
         <div className="absolute inset-0 bg-gradient-to-b from-transparent via-background/10 to-background/50" />
         <motion.div
@@ -62,26 +63,25 @@ const AIVideoBriefing = () => {
         />
       </div>
 
-      <div className="relative z-10 mx-auto flex min-h-[calc(100vh-12rem)] max-w-7xl flex-col justify-center gap-8">
-        <div className="max-w-4xl">
+      <div className="relative z-10 mx-auto flex min-h-[calc(100vh-12rem)] max-w-7xl flex-col justify-center gap-6 lg:gap-8 pb-32">
+        <div className="max-w-4xl space-y-4">
           <Badge variant="outline" className="border-border/40 bg-secondary/40 px-4 py-1 text-[0.65rem] uppercase tracking-[0.32em] text-text-secondary">
             AI Video Engine
           </Badge>
-          <h2 className="mt-6 font-display text-4xl leading-[0.94] text-foreground md:text-6xl">
+          <h2 className="font-display text-3xl leading-tight text-foreground md:text-5xl lg:text-6xl">
             Your daily market brief, narrated by AI.
           </h2>
-          <p className="mt-5 max-w-3xl text-base leading-8 text-text-secondary md:text-lg">
-            A 60-second AI-generated video summary of the most important market moves, signals, and risks — delivered every morning.
+          <p className="max-w-prose text-sm leading-relaxed text-text-secondary md:text-lg">
+            A 60-second AI-generated video summary of the most important market moves, signals, and risks.
           </p>
         </div>
 
-        <div className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
+        <div className="grid grid-cols-1 lg:grid-cols-[1.1fr_0.9fr] gap-6">
           {/* Dynamic Video Pipeline Component */}
           <motion.div
             initial={{ opacity: 0, y: 20, filter: "blur(10px)" }}
             whileInView={{ opacity: 1, y: 0, filter: "blur(0px)" }}
-            viewport={{ once: true, amount: 0.3 }}
-            transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
+            className="w-full max-w-full overflow-hidden"
           >
             <VideoReport data={marketData} />
           </motion.div>
@@ -90,27 +90,25 @@ const AIVideoBriefing = () => {
           <motion.div
             initial={{ opacity: 0, x: 20, filter: "blur(10px)" }}
             whileInView={{ opacity: 1, x: 0, filter: "blur(0px)" }}
-            viewport={{ once: true, amount: 0.3 }}
             transition={{ duration: 0.8, delay: 0.15, ease: [0.16, 1, 0.3, 1] }}
-            className="flex flex-col gap-4"
+            className="flex flex-col gap-4 overflow-hidden"
           >
             {/* Key highlights */}
-            <div className="glass rounded-[1.75rem] border border-border/30 p-6">
-              <p className="text-xs uppercase tracking-[0.28em] text-text-secondary mb-5">Key Highlights</p>
+            <div className="glass rounded-[1.75rem] border border-border/30 p-4 md:p-6">
+              <p className="text-[10px] uppercase tracking-[0.28em] text-text-secondary mb-4">Key Highlights Today</p>
               <div className="space-y-3">
                 {highlights.map((item, index) => (
                   <motion.div
                     key={index}
                     initial={{ opacity: 0, x: 12 }}
                     whileInView={{ opacity: 1, x: 0 }}
-                    viewport={{ once: true }}
                     transition={{ duration: 0.5, delay: 0.3 + index * 0.08, ease: [0.16, 1, 0.3, 1] }}
-                    className="flex items-start gap-3 rounded-xl p-3 bg-secondary/15 border border-border/15"
+                    className="flex items-start gap-3 rounded-xl p-3 bg-secondary/10 border border-border/10 overflow-hidden"
                   >
-                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-accent/10">
-                      <item.icon className="w-3.5 h-3.5 text-accent" />
+                    <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-accent/10">
+                      <item.icon className="w-3 h-3 text-accent" />
                     </div>
-                    <p className="text-sm leading-6 text-foreground/85">{item.text}</p>
+                    <p className="text-xs md:text-sm leading-relaxed text-foreground/80 break-words">{item.text}</p>
                   </motion.div>
                 ))}
               </div>

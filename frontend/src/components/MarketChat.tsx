@@ -1,204 +1,274 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { z } from "zod";
+import { createPortal } from "react-dom";
+import { Send, Bot, User, Loader2, ShieldCheck, ExternalLink, Info, History, TrendingUp, Brain, X, Maximize2, Minimize2, ArrowRight } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Progress } from "@/components/ui/progress";
-import { portfolioImpact } from "@/utils/api.js";
+import { runMarketGPT } from "@/utils/api.js";
+import { useAuth } from "@/context/AuthContext";
+import { db } from "@/lib/firebase";
+import { collection, query, where, getDocs } from "firebase/firestore";
+import { useAI } from "@/context/AIContext";
 
-interface MarketChatProps {
-  eventId: string;
+interface Message {
+  role: "user" | "assistant";
+  content: string;
+  impact?: "Low" | "Medium" | "High";
+  citations?: string[];
+  reasoningTrace?: any[];
+  timestamp: Date;
 }
 
-const portfolioSchema = z
-  .string()
-  .trim()
-  .min(2, "Add at least one stock ticker.")
-  .max(120, "Keep the portfolio input concise.")
-  .regex(/^[A-Za-z,\s]+$/, "Use only stock tickers separated by commas.");
-
-const riskStyles = {
-  Low: "border-success/20 bg-success/10 text-foreground",
-  Medium: "border-warning/20 bg-warning/10 text-foreground",
-  High: "border-critical/20 bg-critical/10 text-foreground",
+const impactStyles = {
+  Low: "border-success/20 bg-success/10 text-success",
+  Medium: "border-warning/20 bg-warning/10 text-warning",
+  High: "border-critical/20 bg-critical/10 text-critical",
 };
 
-const MarketChat = ({ eventId }: MarketChatProps) => {
-  const [holdingsInput, setHoldingsInput] = useState("");
-  const [impactResult, setImpactResult] = useState<any | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [currentEventAnalysis, setCurrentEventAnalysis] = useState<any | null>(null);
+const MarketChat = () => {
+  const { user } = useAuth();
+  const { isChatOpen, setIsChatOpen, initialMessage } = useAI();
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [input, setInput] = useState("");
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [isTyping, setIsTyping] = useState(false);
+  const [userHoldings, setUserHoldings] = useState<string[]>([]);
+  const [activeLessons, setActiveLessons] = useState(0);
+  const [recentSignals, setRecentSignals] = useState<any[]>([]);
+  const [isMounted, setIsMounted] = useState(false);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    const storedAnalysis = localStorage.getItem("et_edge_event_analysis");
-    if (storedAnalysis) {
-      try {
-        setCurrentEventAnalysis(JSON.parse(storedAnalysis));
-      } catch (parseError) {
-        console.error("Failed to parse stored event analysis:", parseError);
-      }
-    }
-  }, []);
-
-  const handleSimulate = () => {
-    const runImpact = async () => {
-      const parsed = portfolioSchema.safeParse(holdingsInput);
-
-    if (!parsed.success) {
-        setError(parsed.error.issues[0]?.message ?? "Please review the portfolio input.");
-      return;
-    }
-
-      const userHoldings = parsed.data
-        .split(",")
-        .map((item) => item.trim())
-        .filter(Boolean);
-
-      if (!currentEventAnalysis) {
-        alert("Please select a news event first on the Events page");
-        return;
-      }
-
-      setIsLoading(true);
-      setError(null);
-
-      const result = await portfolioImpact(userHoldings, currentEventAnalysis);
-      setImpactResult(result);
-      if (!result) {
-        setError("Unable to analyse portfolio impact. Please try again.");
-      }
-      setIsLoading(false);
-    };
-
-    runImpact();
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
 
-  return (
-    <section className="relative min-h-screen overflow-hidden px-6 py-24 md:px-10 lg:px-16">
-      <div className="absolute inset-0 gradient-impact" />
-      <div className="absolute inset-0 vignette-soft pointer-events-none" />
-      <div className="absolute inset-0 pointer-events-none">
-        <motion.div
-          className="absolute left-[8%] top-[18%] h-[28rem] w-[28rem] rounded-full bg-teal/10 blur-[160px]"
-          animate={{ scale: [1, 1.08, 1], opacity: [0.2, 0.4, 0.2] }}
-          transition={{ duration: 14, repeat: Infinity, ease: "easeInOut" }}
-        />
-        <motion.div
-          className="absolute right-[12%] bottom-[20%] h-[24rem] w-[24rem] rounded-full bg-deep-purple/12 blur-[150px]"
-          animate={{ x: [0, 20, 0], opacity: [0.25, 0.4, 0.25] }}
-          transition={{ duration: 16, repeat: Infinity, ease: "easeInOut" }}
-        />
-      </div>
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages, isTyping]);
 
-      <div className="relative z-10 mx-auto flex min-h-[calc(100vh-12rem)] max-w-7xl flex-col justify-center gap-8">
-        <div className="max-w-4xl">
-          <Badge variant="outline" className="border-border/40 bg-secondary/40 px-4 py-1 text-[0.65rem] uppercase tracking-[0.32em] text-text-secondary">
-            Portfolio Impact Simulator
-          </Badge>
-          <h2 className="mt-6 font-display text-4xl leading-[0.94] text-foreground md:text-6xl">Make the event personal before you make a decision.</h2>
-          <p className="mt-5 max-w-3xl text-base leading-8 text-text-secondary md:text-lg">
-            Enter a few holdings and the system translates the current event into exposure, affected names, and a simple decision signal.
-          </p>
+  useEffect(() => {
+    setIsMounted(true);
+    const fetchRefinements = async () => {
+      try {
+        const q = query(collection(db, "system_knowledge"));
+        const snapshot = await getDocs(q);
+        setActiveLessons(snapshot.size);
+      } catch (err) { console.error(err); }
+    };
+    const fetchLatestSignals = async () => {
+      try {
+        const stored = localStorage.getItem("et_edge_radar_signals");
+        if (stored) setRecentSignals(JSON.parse(stored).slice(0, 3));
+      } catch (e) { console.error(e); }
+    };
+    fetchRefinements();
+    fetchLatestSignals();
+  }, []);
+
+  useEffect(() => {
+    if (isChatOpen) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "auto";
+    }
+    return () => { document.body.style.overflow = "auto"; };
+  }, [isChatOpen]);
+
+  useEffect(() => {
+    if (isChatOpen && initialMessage && !initialTriggerRef.current) {
+      initialTriggerRef.current = true;
+      handleSendMessage(initialMessage);
+    }
+  }, [isChatOpen, initialMessage]);
+
+  useEffect(() => {
+    const fetchHoldings = async () => {
+      if (!user) {
+        const local = localStorage.getItem("et_edge_user_holdings");
+        if (local) setUserHoldings(local.split(",").map(s => s.trim()));
+        return;
+      }
+      try {
+        const q = query(collection(db, "users"), where("uid", "==", user.uid));
+        const snapshot = await getDocs(q);
+        if (!snapshot.empty) setUserHoldings(snapshot.docs[0].data().holdings || []);
+      } catch (err) { console.error(err); }
+    };
+    fetchHoldings();
+  }, [user]);
+
+  const handleSendMessage = async (text?: string) => {
+    const messageContent = text || input;
+    if (!messageContent.trim() || isTyping) return;
+
+    const userMsg: Message = { role: "user", content: messageContent, timestamp: new Date() };
+    setMessages(prev => [...prev, userMsg]);
+    if (!text) setInput("");
+    setIsTyping(true);
+
+    try {
+      const result = await runMarketGPT(messageContent, userHoldings);
+      const assistantMsg: Message = {
+        role: "assistant",
+        content: result?.answer || "I apologize, but I encountered an error. Please try again.",
+        impact: result?.impact,
+        citations: result?.citations,
+        reasoningTrace: result?.reasoningTrace,
+        timestamp: new Date(),
+      };
+      setMessages(prev => [...prev, assistantMsg]);
+    } catch (err) { console.error("Chat error:", err); } finally { setIsTyping(false); }
+  };
+
+  const initialTriggerRef = useRef(false);
+
+  if (!isMounted || !isChatOpen) return null;
+
+  return createPortal(
+    <div className="fixed inset-0 z-[9999] pointer-events-none flex items-end justify-center sm:items-center">
+      <motion.div 
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        onClick={() => setIsChatOpen(false)}
+        className="absolute inset-0 bg-black/60 backdrop-blur-xl pointer-events-auto"
+      />
+
+      <motion.div 
+        initial={{ opacity: 0, scale: 0.9, y: 100 }}
+        animate={{ 
+          opacity: 1, 
+          scale: 1, 
+          y: 0,
+          width: isFullscreen ? "100%" : "min(1280px, 100vw)",
+          height: isFullscreen ? "100dvh" : "min(850px, 90dvh)",
+          right: isFullscreen ? "0" : (window.innerWidth > 640 ? "2rem" : "0"),
+          bottom: isFullscreen ? "0" : (window.innerWidth > 640 ? "2rem" : "0"),
+        }}
+        exit={{ opacity: 0, scale: 0.9, y: 100 }}
+        style={{ contain: "layout" }}
+        className={`fixed z-10 flex flex-col bg-[#020617] ring-1 ring-white/10 shadow-3xl overflow-hidden pointer-events-auto w-full sm:w-auto h-full sm:h-auto ${isFullscreen ? "rounded-none" : "rounded-t-[2.5rem] sm:rounded-[2.5rem]"}`}
+      >
+        <AnimatePresence>
+          {activeLessons > 0 && (
+            <motion.div 
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="absolute top-24 right-4 lg:right-10 z-[100] flex items-center gap-2 group cursor-help bg-accent/20 border border-accent/30 px-4 py-2 rounded-2xl backdrop-blur-md shadow-lg shadow-accent/5"
+            >
+              <Brain size={16} className="text-accent animate-pulse" />
+              <div className="text-[10px] text-accent font-black uppercase tracking-[0.2em]">{activeLessons} Refinements Active</div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Header Navigation */}
+        <div className="flex items-center justify-between px-6 py-5 lg:px-10 lg:py-8 border-b border-white/5 bg-white/5 shrink-0 pt-[env(safe-area-inset-top,1.25rem)] lg:pt-8">
+          <div className="flex items-center gap-5">
+            <div className="w-10 h-10 lg:w-12 lg:h-12 rounded-2xl bg-accent/10 flex items-center justify-center border border-accent/20">
+              <Bot className="text-accent" size={20} />
+            </div>
+            <div>
+              <h3 className="font-display text-[clamp(1.1rem,4vw,1.4rem)] text-white font-black tracking-tight leading-tight">ET Edge Command</h3>
+              <div className="flex items-center gap-3 mt-1.5 opacity-60">
+                 <Badge variant="outline" className="rounded-full px-2 py-0 border-white/10 text-[8px] uppercase tracking-widest font-bold">V4.0 - Recursive Memory</Badge>
+              </div>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button variant="ghost" size="icon" onClick={() => setIsFullscreen(!isFullscreen)} className="w-10 h-10 lg:w-12 lg:h-12 text-white/40 hover:text-white hover:bg-white/10 rounded-2xl transition-all">
+              {isFullscreen ? <Minimize2 size={18} /> : <Maximize2 size={18} />}
+            </Button>
+            <Button variant="ghost" size="icon" onClick={() => setIsChatOpen(false)} className="w-10 h-10 lg:w-12 lg:h-12 text-white/40 hover:text-red-400 hover:bg-red-400/10 rounded-2xl transition-all">
+              <X size={20} />
+            </Button>
+          </div>
         </div>
 
-        <div className="grid gap-6 lg:grid-cols-[0.88fr_1.12fr]">
-          <motion.div
-            initial={{ opacity: 0, x: -24, filter: "blur(10px)" }}
-            whileInView={{ opacity: 1, x: 0, filter: "blur(0px)" }}
-            viewport={{ once: true, amount: 0.3 }}
-            transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
-            className="glass-strong rounded-[2rem] p-8"
-          >
-            <p className="text-xs uppercase tracking-[0.28em] text-text-secondary">Portfolio input</p>
-            <div className="mt-5 space-y-4">
-              <Input
-                value={holdingsInput}
-                onChange={(event) => setHoldingsInput(event.target.value)}
-                placeholder="HDFCBANK, SBIN, DLF"
-                className="h-12 rounded-2xl border-border/30 bg-secondary/30 text-foreground placeholder:text-text-secondary/60 focus-visible:ring-primary/40"
-              />
-              <p className="text-sm leading-7 text-text-secondary">Current event in focus: <span className="text-foreground">{currentEventAnalysis?.whatHappened ?? "No event selected yet"}</span></p>
-              {error ? <p className="text-sm text-critical">{error}</p> : null}
-              <Button onClick={handleSimulate} className="h-12 rounded-2xl px-6">
-                {isLoading ? "Analysing..." : "Simulate impact"}
-              </Button>
+        {/* Messaging Area */}
+        <div className="flex-1 overflow-y-auto p-6 lg:p-12 space-y-10 scrollbar-thin no-scrollbar relative flex flex-col min-h-0">
+          {messages.length === 0 ? (
+            <div className="my-auto flex flex-col items-center justify-center text-center space-y-8 lg:space-y-10">
+              <div className="relative">
+                <div className="absolute inset-0 bg-accent/20 blur-3xl rounded-full" />
+                <Bot size={48} className="text-accent lg:text-accent relative z-10 lg:w-16 lg:h-16" />
+              </div>
+              
+              <div className="max-w-md space-y-4">
+                <h4 className="font-display text-[clamp(1.5rem,6vw,2.25rem)] text-white font-heavy tracking-tighter">Neural Core</h4>
+                <p className="text-xs lg:text-sm text-white/60 leading-relaxed font-medium">
+                  Autonomous financial agent. Ask about risk clusters or technical breakouts.
+                </p>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 lg:gap-4 w-full max-w-2xl px-4 lg:px-0">
+                {[
+                  { icon: "🔍", text: "Analyze HDFC's RSI breakout" },
+                  { icon: "📊", text: "Impact of recent bulk deals?" },
+                  { icon: "🛡️", text: "My portfolio risk today?" },
+                  { icon: "📈", text: "Balanced view on IT sector" }
+                ].map(q => (
+                  <button 
+                    key={q.text}
+                    onClick={() => handleSendMessage(q.text)}
+                    className="group relative flex items-center gap-4 p-4 lg:p-5 text-left rounded-2xl lg:rounded-3xl border border-white/5 bg-white/5 hover:bg-white/10 transition-all duration-300"
+                  >
+                    <span className="text-xl lg:text-2xl">{q.icon}</span>
+                    <span className="text-[10px] lg:text-xs text-white/70 group-hover:text-white font-bold transition-colors">{q.text}</span>
+                  </button>
+                ))}
+              </div>
             </div>
-          </motion.div>
-
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={`${eventId}-${holdingsInput}`}
-              initial={{ opacity: 0, y: 24, filter: "blur(10px)" }}
-              animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
-              exit={{ opacity: 0, y: -16, filter: "blur(8px)" }}
-              transition={{ duration: 0.75, ease: [0.16, 1, 0.3, 1] }}
-              className="glass rounded-[2rem] p-8"
-            >
-              <div className="flex flex-col gap-5 md:flex-row md:items-start md:justify-between">
-                <div>
-                  <p className="text-xs uppercase tracking-[0.28em] text-text-secondary">Exposure</p>
-                  <h3 className="mt-3 font-display text-4xl text-foreground">{impactResult?.riskScore ?? 0}%</h3>
-                </div>
-                <Badge
-                  variant="outline"
-                  className={`rounded-full px-4 py-1 text-xs ${
-                    impactResult?.overallVerdict === "Low"
-                      ? riskStyles.Low
-                      : impactResult?.overallVerdict === "Medium"
-                        ? riskStyles.Medium
-                        : riskStyles.High
-                  }`}
-                >
-                  {impactResult?.overallVerdict ?? "High"} risk
-                </Badge>
-              </div>
-
-              <div className="mt-6">
-                <Progress value={impactResult?.riskScore ?? 0} className="h-3 bg-secondary/70" />
-              </div>
-
-              <div className="mt-8 grid gap-4 md:grid-cols-3">
-                <div className="rounded-[1.5rem] border border-border/30 bg-secondary/30 p-5">
-                  <p className="text-xs uppercase tracking-[0.24em] text-text-secondary">Affected stocks</p>
-                  <p className="mt-3 font-display text-3xl text-foreground">{impactResult?.stockImpacts?.length ?? 0}</p>
-                </div>
-                <div className="rounded-[1.5rem] border border-border/30 bg-secondary/30 p-5">
-                  <p className="text-xs uppercase tracking-[0.24em] text-text-secondary">Relatively safe</p>
-                  <p className="mt-3 font-display text-3xl text-foreground">{impactResult?.overallVerdict ?? "-"}</p>
-                </div>
-                <div className="rounded-[1.5rem] border border-border/30 bg-secondary/30 p-5">
-                  <p className="text-xs uppercase tracking-[0.24em] text-text-secondary">Decision signal</p>
-                  <p className="mt-3 font-display text-3xl text-foreground">
-                    {impactResult?.overallVerdict === "Low" ? "Steady" : impactResult?.overallVerdict === "Medium" ? "Review" : "Protect"}
-                  </p>
-                </div>
-              </div>
-
-              <div className="mt-8 grid gap-4 lg:grid-cols-[1fr_0.9fr]">
-                <div className="rounded-[1.5rem] border border-border/30 bg-secondary/20 p-5">
-                  <p className="text-xs uppercase tracking-[0.24em] text-text-secondary">Names in the event path</p>
-                  <div className="mt-4 grid gap-2">
-                    {impactResult?.stockImpacts?.length ? impactResult.stockImpacts.map((stock: any) => (
-                      <div key={stock.symbol} className="rounded-xl border border-border/30 bg-secondary/20 p-3 text-sm text-foreground">
-                        {stock.symbol} - {stock.impactLevel} - {stock.direction} - {stock.plainEnglishReason}
-                      </div>
-                    )) : <p className="text-sm leading-7 text-text-secondary">No portfolio analysis yet.</p>}
+          ) : (
+            <div className="space-y-8 lg:space-y-10">
+              {messages.map((msg, i) => (
+                <motion.div key={i} initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} className={`flex gap-4 lg:gap-6 ${msg.role === "user" ? "flex-row-reverse" : "flex-row"}`}>
+                  <div className={`w-8 h-8 lg:w-10 lg:h-10 rounded-xl lg:rounded-2xl shrink-0 flex items-center justify-center ${msg.role === "assistant" ? "bg-accent/10 text-accent border border-accent/20" : "bg-white/10"}`}>
+                    {msg.role === "assistant" ? <Bot size={16} /> : <User size={16} />}
+                  </div>
+                  <div className={`max-w-[85%] lg:max-w-[75%] space-y-4 ${msg.role === "user" ? "text-right" : "text-left"}`}>
+                    <div className={`p-4 lg:p-6 rounded-[1.5rem] lg:rounded-[2rem] border shadow-xl ${msg.role === "user" ? "bg-accent text-white border-transparent" : "bg-white/5 border-white/10 text-white/90"}`}>
+                      <p className="text-xs lg:text-base leading-[1.6] lg:leading-[1.8] font-medium whitespace-pre-wrap">{msg.content}</p>
+                    </div>
+                  </div>
+                </motion.div>
+              ))}
+              {isTyping && (
+                <div className="flex gap-4 lg:gap-6">
+                  <div className="w-8 h-8 lg:w-10 lg:h-10 rounded-xl lg:rounded-2xl bg-accent/10 flex items-center justify-center border border-accent/20"><Loader2 size={16} className="text-accent animate-spin" /></div>
+                  <div className="bg-white/5 border border-white/10 p-4 lg:p-6 rounded-[1.5rem] lg:rounded-[2rem] min-w-[200px] lg:min-w-[240px]">
+                     <span className="text-[9px] lg:text-[10px] uppercase tracking-[0.3em] text-accent font-black animate-pulse">Reasoning trace...</span>
                   </div>
                 </div>
-                <div className="rounded-[1.5rem] border border-border/30 bg-secondary/20 p-5">
-                  <p className="text-xs uppercase tracking-[0.24em] text-text-secondary">AI interpretation</p>
-                  <p className="mt-4 text-sm leading-7 text-foreground">{impactResult?.verdictExplanation ?? "Add holdings and simulate impact to see AI interpretation."}</p>
-                </div>
-              </div>
-            </motion.div>
-          </AnimatePresence>
+              )}
+              <div ref={messagesEndRef} className="h-4 w-full shrink-0" />
+            </div>
+          )}
         </div>
-      </div>
-    </section>
+
+        {/* Input Area */}
+        <div className="p-4 lg:p-10 border-t border-white/5 bg-black/40 shrink-0 pb-[max(1rem,env(safe-area-inset-bottom,1.25rem))]">
+          <form onSubmit={(e) => { e.preventDefault(); handleSendMessage(); }} className="relative flex items-center gap-3 lg:gap-4">
+            <Input value={input} onChange={(e) => setInput(e.target.value)} disabled={isTyping} placeholder="Ask neural core..." className="h-14 lg:h-20 rounded-2xl lg:rounded-3xl pl-12 lg:pl-16 pr-24 lg:pr-32 border-white/10 bg-white/5 focus-visible:ring-accent/30 text-sm lg:text-lg font-medium" />
+            <div className="absolute left-4 lg:left-6 text-white/20"><Bot size={20} className="lg:w-7 lg:h-7" /></div>
+            <div className="absolute right-2 lg:right-4">
+              <Button type="submit" disabled={!input.trim() || isTyping} className="h-10 lg:h-14 rounded-xl lg:rounded-2xl px-6 lg:px-8 bg-accent text-white font-heavy">
+                {isTyping ? <Loader2 size={20} className="animate-spin" /> : <Send size={20} className="lg:w-6 lg:h-6" />}
+              </Button>
+            </div>
+          </form>
+          
+          <div className="mt-4 lg:mt-8 flex flex-wrap items-center justify-center gap-x-8 lg:gap-x-12 gap-y-3 lg:gap-y-4 text-[8px] lg:text-[10px] text-white/30 uppercase tracking-[0.2em] lg:tracking-[0.3em] font-black">
+             <span className="flex items-center gap-2 lg:gap-3"><div className="w-1 h-1 lg:w-1.5 lg:h-1.5 rounded-full bg-success animate-pulse" /> Verified Sources</span>
+             <span className="flex items-center gap-2 lg:gap-3"><div className="w-1 h-1 lg:w-1.5 lg:h-1.5 rounded-full bg-accent animate-pulse" /> Recursive loop</span>
+          </div>
+        </div>
+      </motion.div>
+    </div>,
+    document.body
   );
 };
 

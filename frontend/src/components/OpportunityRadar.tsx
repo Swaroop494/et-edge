@@ -41,10 +41,11 @@ const OpportunityRadar = ({ selectedEventId, onSelectEvent }: OpportunityRadarPr
   };
 
   return (
-    <section className="relative min-h-screen overflow-hidden px-6 py-24 md:px-10 lg:px-16">
-      <div className="absolute inset-0 gradient-event" />
-      <div className="absolute inset-0 gradient-hero ambient-shift" />
+    <section className="relative min-h-screen overflow-hidden px-4 md:px-10 lg:px-16 py-16 md:py-24 bg-fixed">
+      <div className="absolute inset-0 gradient-event bg-fixed" />
+      <div className="absolute inset-0 gradient-hero ambient-shift bg-fixed" />
       <div className="absolute inset-0 vignette-soft pointer-events-none" />
+      
       <div className="absolute inset-0 pointer-events-none">
         <motion.div
           className="absolute left-[5%] top-[8%] h-[32rem] w-[32rem] rounded-full bg-neon-cyan/15 blur-[160px]"
@@ -63,28 +64,28 @@ const OpportunityRadar = ({ selectedEventId, onSelectEvent }: OpportunityRadarPr
         />
       </div>
 
-      <div className="relative z-10 mx-auto flex min-h-[calc(100vh-12rem)] max-w-7xl flex-col justify-center gap-14">
+      <div className="relative z-10 mx-auto flex min-h-[calc(100vh-12rem)] max-w-7xl flex-col justify-center gap-10 lg:gap-14 pb-28">
         <motion.div
           initial={{ opacity: 0, y: 28, filter: "blur(12px)" }}
           animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
           transition={{ duration: 1, ease: [0.16, 1, 0.3, 1] }}
-          className="grid gap-10 lg:grid-cols-[1.1fr_0.9fr] lg:items-end"
+          className="grid gap-8 lg:grid-cols-[1.1fr_0.9fr] lg:items-end"
         >
-          <div className="max-w-4xl space-y-7">
-            <div className="flex flex-wrap items-center gap-3">
-              <Badge variant="outline" className="border-border/40 bg-secondary/40 px-4 py-1 text-[0.65rem] uppercase tracking-[0.32em] text-text-secondary">
+          <div className="max-w-4xl space-y-6">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+              <Badge variant="outline" className="w-fit border-border/40 bg-secondary/40 px-4 py-1 text-[0.65rem] uppercase tracking-[0.32em] text-text-secondary">
                 Event Intelligence
               </Badge>
-              <div className="glass rounded-full px-4 py-2 text-xs text-text-secondary">
-                AI Accuracy <span className="ml-2 text-foreground">72% → 76%</span>
+              <div className="glass w-fit rounded-full px-4 py-2 text-[10px] md:text-xs text-text-secondary">
+                AI Accuracy <span className="ml-2 text-foreground font-bold">72% → 76%</span>
               </div>
             </div>
 
-            <div className="space-y-5">
-              <h1 className="font-display text-5xl leading-[0.9] text-foreground md:text-7xl lg:text-[5.6rem]">
+            <div className="space-y-4">
+              <h1 className="font-display text-4xl leading-[1.1] text-foreground md:text-6xl lg:text-[5.6rem] tracking-tighter">
                 See the <span className="text-gradient-primary">event</span> before it becomes everyone else's story.
               </h1>
-              <p className="max-w-2xl text-base leading-8 text-text-secondary md:text-lg">
+              <p className="max-w-prose text-sm leading-relaxed text-text-secondary md:text-lg">
                 ET Edge now begins with event-driven reasoning — detect what changed, understand why it matters, and follow the impact through your decisions.
               </p>
             </div>

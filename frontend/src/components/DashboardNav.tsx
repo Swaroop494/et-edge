@@ -26,101 +26,116 @@ const DashboardNav = () => {
   const [isLoggingOut, setIsLoggingOut] = useState(false);
 
   return (
-    <nav className="fixed right-3 top-1/2 z-50 hidden -translate-y-1/2 md:flex md:flex-col md:items-center md:gap-1">
-      <div
-        className="flex flex-col items-center gap-1 rounded-2xl px-2 py-3"
-        style={{
-          background: "hsl(var(--glass-bg) / 0.4)",
-          backdropFilter: "blur(24px)",
-          WebkitBackdropFilter: "blur(24px)",
-          border: "1px solid hsl(var(--glass-border) / 0.15)",
-        }}
-      >
-        {moduleConfig.map((config) => {
-          const Icon = config.icon;
-          const isActive = pathname === config.path;
+    <>
+      {/* Desktop Vertical Sidebar (lg+) */}
+      <nav className="fixed right-6 top-1/2 z-50 hidden -translate-y-1/2 lg:flex lg:flex-col lg:items-center lg:gap-1">
+        <div
+          className="flex flex-col items-center gap-1 rounded-3xl px-3 py-4 glass-strong border border-white/5"
+          style={{
+            backdropFilter: "blur(40px)",
+            WebkitBackdropFilter: "blur(40px)",
+          }}
+        >
+          {moduleConfig.map((config) => {
+            const Icon = config.icon;
+            const isActive = pathname === config.path;
 
-          return (
-            <motion.button
-              key={config.path}
-              onClick={() => router.push(config.path)}
-              whileHover={{ scale: 1.08 }}
-              whileTap={{ scale: 0.95 }}
-              className={`relative flex flex-col items-center justify-center w-14 h-14 rounded-xl transition-all duration-300 group ${
-                isActive
-                  ? "text-accent"
-                  : "text-muted-foreground/50 hover:text-muted-foreground"
-              }`}
-              style={
-                isActive
-                  ? {
-                      background: "hsl(var(--accent) / 0.12)",
-                      boxShadow: "0 0 20px hsl(var(--accent) / 0.15)",
-                    }
-                  : undefined
-              }
-              aria-label={`Go to ${config.label}`}
-            >
-              {/* Active glow ring */}
-              {isActive && (
-                <motion.span
-                  layoutId="nav-active-ring"
-                  className="absolute inset-0 rounded-xl"
-                  style={{ border: "1px solid hsl(var(--accent) / 0.3)" }}
-                  transition={{ type: "spring", stiffness: 400, damping: 30 }}
-                />
-              )}
-
-              <Icon
-                className={`w-5 h-5 transition-all duration-300 ${
+            return (
+              <motion.button
+                key={config.path}
+                onClick={() => router.push(config.path)}
+                whileHover={{ scale: 1.08 }}
+                whileTap={{ scale: 0.95 }}
+                className={`relative flex flex-col items-center justify-center w-14 h-14 rounded-2xl transition-all duration-300 group ${
                   isActive
-                    ? "drop-shadow-[0_0_6px_hsl(var(--accent)/0.5)]"
-                    : "group-hover:drop-shadow-[0_0_4px_hsl(var(--accent)/0.3)]"
+                    ? "text-accent"
+                    : "text-white/40 hover:text-white"
                 }`}
-                strokeWidth={isActive ? 2 : 1.5}
-              />
-              <span
-                className={`text-[9px] font-medium mt-1 transition-opacity duration-300 ${
-                  isActive ? "opacity-100" : "opacity-50 group-hover:opacity-80"
+                style={
+                  isActive
+                    ? {
+                        background: "hsl(var(--accent) / 0.15)",
+                        boxShadow: "0 0 20px hsl(var(--accent) / 0.2)",
+                      }
+                    : undefined
+                }
+                aria-label={`Go to ${config.label}`}
+              >
+                {isActive && (
+                  <motion.span
+                    layoutId="nav-active-ring"
+                    className="absolute inset-0 rounded-2xl border border-accent/40"
+                    transition={{ type: "spring", stiffness: 400, damping: 30 }}
+                  />
+                )}
+
+                <Icon
+                  className={`w-5 h-5 transition-all duration-300 ${
+                    isActive
+                      ? "drop-shadow-[0_0_8px_hsl(var(--accent)/0.6)]"
+                      : "group-hover:drop-shadow-[0_0_4px_hsl(var(--accent)/0.3)]"
+                  }`}
+                  strokeWidth={isActive ? 2.5 : 1.5}
+                />
+                <span
+                  className={`text-[9px] font-bold mt-1 uppercase tracking-widest transition-opacity duration-300 ${
+                    isActive ? "opacity-100" : "opacity-40 group-hover:opacity-100"
+                  }`}
+                >
+                  {config.label}
+                </span>
+              </motion.button>
+            );
+          })}
+          
+          <div className="mt-4 pt-4 border-t border-white/5 flex flex-col items-center gap-4">
+            <button
+              onClick={async () => {
+                if (isLoggingOut) return;
+                setIsLoggingOut(true);
+                try {
+                  await signOut(auth);
+                  toast.success("Logged out successfully");
+                  router.push("/");
+                } catch (e) {
+                  toast.error("Logout failed");
+                } finally {
+                  setIsLoggingOut(false);
+                }
+              }}
+              className="p-3 text-white/30 hover:text-red-500 transition-colors"
+            >
+              {isLoggingOut ? <Loader2 className="w-5 h-5 animate-spin" /> : <LogOut className="w-5 h-5" />}
+            </button>
+          </div>
+        </div>
+      </nav>
+
+      {/* Mobile Bottom Navigation (lg-) */}
+      <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-50 pointer-events-auto pb-[max(0.75rem,env(safe-area-inset-bottom))] bg-black/40 backdrop-blur-3xl border-t border-white/5 shadow-[0_-10px_40px_rgba(0,0,0,0.5)]">
+        <div className="flex items-center justify-around px-2 py-3 overflow-x-auto no-scrollbar">
+          {moduleConfig.slice(0, 5).map((config) => {
+            const Icon = config.icon;
+            const isActive = pathname === config.path;
+
+            return (
+              <button
+                key={config.path}
+                onClick={() => router.push(config.path)}
+                className={`relative flex flex-col items-center justify-center px-4 py-2 rounded-2xl transition-all duration-300 ${
+                  isActive ? "text-accent bg-accent/10" : "text-white/40"
                 }`}
               >
-                {config.label}
-              </span>
-            </motion.button>
-          );
-        })}
-        <div className="mt-auto pt-4 border-t border-border/20 flex flex-col items-center justify-center gap-2">
-          {user?.photoURL ? (
-            <img src={user.photoURL} alt="User Profile" className="w-8 h-8 rounded-full" />
-          ) : (
-            <div className="w-8 h-8 rounded-full bg-secondary flex items-center justify-center">
-              <span className="text-xs font-bold">{user?.email?.charAt(0).toUpperCase()}</span>
-            </div>
-          )}
-          <button
-            onClick={async () => {
-              if (isLoggingOut) return;
-              setIsLoggingOut(true);
-              try {
-                await signOut(auth);
-                toast.success("You have been logged out successfully.", { duration: 3000 });
-                await new Promise((resolve) => setTimeout(resolve, 1000));
-                router.push("/");
-              } catch (e) {
-                toast.error("Logout failed. Please try again.");
-              } finally {
-                setIsLoggingOut(false);
-              }
-            }}
-            className="p-2 text-muted-foreground/50 hover:text-red-500 transition-colors"
-            title={isLoggingOut ? "Logging out..." : "Logout"}
-            aria-label={isLoggingOut ? "Logging out..." : "Logout"}
-          >
-            {isLoggingOut ? <Loader2 className="w-4 h-4 animate-spin" /> : <LogOut className="w-4 h-4" />}
-          </button>
+                <Icon size={20} className={isActive ? "drop-shadow-[0_0_8px_hsl(var(--accent)/0.5)]" : ""} />
+                <span className={`text-[8px] mt-1 font-bold uppercase tracking-tighter ${isActive ? "opacity-100" : "opacity-40"}`}>
+                  {config.label}
+                </span>
+              </button>
+            );
+          })}
         </div>
-      </div>
-    </nav>
+      </nav>
+    </>
   );
 };
 

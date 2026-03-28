@@ -105,13 +105,72 @@ export async function portfolioImpact(userHoldings, eventAnalysis) {
 export async function runAgent(userHoldings, tip) {
   try {
     const response = await fetch(`${API_BASE}/agent/run`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ userHoldings: userHoldings || [], tip: tip || '' }),
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userHoldings: userHoldings || [], tip: tip || "" }),
     });
     return await response.json();
   } catch (error) {
-    console.error('runAgent error:', error);
+    console.error("runAgent error:", error);
+    return null;
+  }
+}
+
+export async function runBulkDealAgent(filing) {
+  try {
+    const headers = await getAuthHeaders();
+    const response = await fetch(`${API_BASE}/agent/bulk-deal`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ filing }),
+    });
+    return await response.json();
+  } catch (error) {
+    console.error("runBulkDealAgent error:", error);
+    return null;
+  }
+}
+
+export async function runTechnicalAgent(signal) {
+  try {
+    const headers = await getAuthHeaders();
+    const response = await fetch(`${API_BASE}/agent/technical`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ signal }),
+    });
+    return await response.json();
+  } catch (error) {
+    console.error("runTechnicalAgent error:", error);
+    return null;
+  }
+}
+
+export async function runPortfolioNewsAgent(portfolio, events) {
+  try {
+    const headers = await getAuthHeaders();
+    const response = await fetch(`${API_BASE}/agent/portfolio-news`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ portfolio, events }),
+    });
+    return await response.json();
+  } catch (error) {
+    console.error("runPortfolioNewsAgent error:", error);
+    return null;
+  }
+}
+export async function runMarketGPT(query, userHoldings) {
+  try {
+    const headers = await getAuthHeaders();
+    const response = await fetch(`${API_BASE}/market-gpt`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ query, userHoldings }),
+    });
+    return await response.json();
+  } catch (error) {
+    console.error("runMarketGPT error:", error);
     return null;
   }
 }

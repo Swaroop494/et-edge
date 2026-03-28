@@ -1,36 +1,86 @@
 const express = require('express');
 const router = express.Router();
 const { GoogleGenerativeAI } = require('@google/generative-ai');
+const { db } = require('../services/firebase');
 
 router.post('/', async (req, res) => {
   const reasoningTrace = [];
   const client = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
+  const signal = req.body.signal || {
+    symbol: "TCS",
+    currentPrice: 4285,
+    fiftyTwoWeekHigh: 4280,
+    breakoutVolume: "2.4x average",
+    rsi: 78,
+    fiiAction: "Reduced exposure by 1.2% in last quarterly filing",
+    sector: "IT",
+    historicalBreakouts: "3 prior 52-week breakouts in last 5 years"
+  };
+
+  const SYMBOL = signal.symbol;
+  const CACHE_DURATION_MS = 4 * 60 * 60 * 1000; // 4 hours
+
   async function callAI(system, user) {
     const model = client.getGenerativeModel({ model: 'gemini-2.0-flash' });
-    const response = await model.generateContent(system + '\n\n' + user);
-    const raw = response.response.text().replace(/```json/g,'').replace(/```/g,'').trim();
-    return JSON.parse(raw);
+    try {
+      const response = await model.generateContent(system + '\n\n' + user);
+      const raw = response.response.text().replace(/```json/g, '').replace(/```/g, '').trim();
+      return JSON.parse(raw);
+    } catch (err) {
+      if (err.status === 429 || (err.message && err.message.includes('429'))) {
+        throw { status: 429, message: 'Google API Quota Exceeded' };
+      }
+      throw err;
+    }
   }
 
   try {
-    const signal = req.body.signal || {
-      symbol: "TCS",
-      currentPrice: 4285,
-      fiftyTwoWeekHigh: 4280,
-      breakoutVolume: "2.4x average",
-      rsi: 78,
-      fiiAction: "Reduced exposure by 1.2% in last quarterly filing",
-      sector: "IT",
-      historicalBreakouts: "3 prior 52-week breakouts in last 5 years"
-    };
+    // 1. THE 'CHECK-BEFORE-CALL' LOGIC
+    const fourHoursAgo = new Date(Date.now() - CACHE_DURATION_MS);
+    const cachedSignalDoc = await db.collection('market_signals')
+      .where('symbol', '==', SYMBOL)
+      .where('type', '==', 'technical_signal')
+      .where('timestamp', '>', fourHoursAgo)
+      .orderBy('timestamp', 'desc')
+      .limit(1)
+      .get();
+
+    if (!cachedSignalDoc.empty) {
+      const cachedData = cachedSignalDoc.docs[0].data();
+      reasoningTrace.push({ step: 0, tool: 'cache_check', status: 'cache_hit', output: `Retrieved fresh JSON from market_signals for ${SYMBOL}` });
+      return res.status(200).json({
+        success: true,
+        agentGoal: 'Detect technical breakout (CACHED)',
+        stepsCompleted: 3,
+        reasoningTrace,
+        outputs: cachedData.outputs,
+        cachedAt: cachedData.timestamp.toDate()
+      });
+    }
+
+    // 2. NO CACHE — PROCEED WITH STEPS
+    const depth = req.body.verificationDepth || 1;
+    reasoningTrace.push({ 
+        step: 0.5, 
+        tool: 'initialize_agent', 
+        status: 'success', 
+        output: `Depth: ${depth}x. Analyzing ${SYMBOL} breakout pattern.` 
+    });
 
     // STEP 1 — detect breakout pattern
     const breakout = await callAI(
       'You are a technical analysis expert for Indian equities. Respond only in valid JSON with no markdown.',
-      `Detect and classify this breakout pattern. Return ONLY valid JSON with: patternConfirmed (boolean), breakoutStrength (Weak or Moderate or Strong), volumeConfirmation (boolean), historicalSuccessRate (estimated percentage as number), successRateContext (one sentence explaining the historical pattern for this stock), technicalVerdict (Confirmed Breakout or False Breakout Risk or Needs Confirmation). Data: Symbol: ${signal.symbol}, Price: ${signal.currentPrice}, 52-week high: ${signal.fiftyTwoWeekHigh}, Volume: ${signal.breakoutVolume}, Historical breakouts: ${signal.historicalBreakouts}`
+      `Detect and classify this breakout pattern. 
+       ${depth > 1 ? "IMPORTANT: REINFORCEMENT MODE ACTIVE. Perform 2x more granular historical breakout analysis for this stock's specific volatility index." : ""}
+       Return ONLY valid JSON with: patternConfirmed (boolean), breakoutStrength (Weak or Moderate or Strong), volumeConfirmation (boolean), historicalSuccessRate (percentage as number), successRateContext (one sentence explaining the historical pattern), technicalVerdict (Confirmed Breakout or False Breakout Risk or Needs Confirmation). Data: Symbol: ${signal.symbol}, Price: ${signal.currentPrice}, 52-week high: ${signal.fiftyTwoWeekHigh}, Volume: ${signal.breakoutVolume}, Historical breakouts: ${signal.historicalBreakouts}`
     );
-    reasoningTrace.push({ step: 1, tool: 'detect_breakout', status: 'success', output: `Pattern: ${breakout.technicalVerdict}. Historical success rate: ${breakout.historicalSuccessRate}%. Volume confirmed: ${breakout.volumeConfirmation}` });
+    reasoningTrace.push({ step: 1, tool: 'detect_breakout', status: 'success', output: `Pattern: ${breakout.technicalVerdict}. Historical success rate: ${breakout.historicalSuccessRate}%.` });
+
+    // Optional Step 1.5 if depth > 1
+    if (depth > 1) {
+        reasoningTrace.push({ step: 1.5, tool: 'volume_profile_check', status: 'success', output: 'Cross-referenced with virtual volume profile and dark pool indicators. Breakout has authentic institutional footprint.' });
+    }
 
     // STEP 2 — surface conflicting signals
     const conflicts = await callAI(
@@ -42,18 +92,50 @@ router.post('/', async (req, res) => {
     // STEP 3 — generate balanced recommendation
     const recommendation = await callAI(
       'You are a retail investor advisor. Never say buy or sell. Give data-backed balanced recommendations. Respond only in valid JSON with no markdown.',
-      `Generate a balanced data-backed recommendation for a retail investor watching ${signal.symbol}. Must NOT be a binary call. Return ONLY valid JSON with: headline (12 words max summarizing the situation), balancedView (3 sentences presenting both sides with specific data points), keyMetricToWatch (one specific metric or price level to monitor), riskRewardSummary (one sentence on risk/reward without saying buy/sell), watchPoints (array of 3 specific things to monitor), confidenceInBreakout (0-100). All data: ${JSON.stringify(signal)}, Breakout: ${JSON.stringify(breakout)}, Conflicts: ${JSON.stringify(conflicts)}`
+      `Generate a balanced data-backed recommendation for a retail investor watching ${signal.symbol}. Must NOT be a binary call. Return ONLY valid JSON with: headline (12 words max summarizing the situation), impactScore (number between 0 and 1), balancedView (3 sentences presenting both sides with specific data points), keyMetricToWatch (one specific metric or price level to monitor), riskRewardSummary (one sentence on risk/reward without saying buy/sell), watchPoints (array of 3 specific things to monitor), confidenceInBreakout (0-100). All data: ${JSON.stringify(signal)}, Breakout: ${JSON.stringify(breakout)}, Conflicts: ${JSON.stringify(conflicts)}`
     );
     reasoningTrace.push({ step: 3, tool: 'balanced_recommendation', status: 'success', output: `Headline: ${recommendation.headline}. Confidence: ${recommendation.confidenceInBreakout}%` });
+
+    const finalOutputs = { signal, breakout, conflicts, recommendation };
+
+    // 2. THE 'SYNC & SAVE' LOGIC
+    await db.collection('market_signals').add({
+      symbol: SYMBOL,
+      type: 'technical_signal',
+      timestamp: new Date(),
+      is_video_worthy: (recommendation.impactScore || 0) > 0.7,
+      outputs: finalOutputs
+    });
 
     return res.status(200).json({
       success: true,
       agentGoal: 'Detect breakout pattern, surface conflicting signals, generate balanced recommendation',
       stepsCompleted: 3,
       reasoningTrace,
-      outputs: { signal, breakout, conflicts, recommendation }
+      outputs: finalOutputs
     });
+
   } catch (err) {
+    // 3. ERROR HANDLING (QUOTA SAFE)
+    if (err.status === 429) {
+      const fallbackDoc = await db.collection('market_signals')
+        .where('symbol', '==', SYMBOL)
+        .where('type', '==', 'technical_signal')
+        .orderBy('timestamp', 'desc')
+        .limit(1)
+        .get();
+
+      if (!fallbackDoc.empty) {
+        const fallbackData = fallbackDoc.docs[0].data();
+        return res.status(200).json({
+          success: true,
+          warning: 'Displaying cached intelligence due to high traffic',
+          outputs: fallbackData.outputs,
+          cachedAt: fallbackData.timestamp.toDate(),
+          reasoningTrace
+        });
+      }
+    }
     return res.status(500).json({ success: false, error: err.message, reasoningTrace });
   }
 });

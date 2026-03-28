@@ -12,6 +12,10 @@ const agentRoute = require('./routes/agent');
 const bulkDealAgentRoute = require('./routes/bulkDealAgent');
 const technicalAgentRoute = require('./routes/technicalAgent');
 const portfolioNewsAgentRoute = require('./routes/portfolioNewsAgent');
+const marketGptRoute = require('./routes/marketGpt');
+const learningLoopRoute = require('./routes/learningLoop');
+
+
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -36,6 +40,10 @@ app.use('/api/agent/run', agentRoute);
 app.use('/api/agent/bulk-deal', bulkDealAgentRoute);
 app.use('/api/agent/technical', technicalAgentRoute);
 app.use('/api/agent/portfolio-news', portfolioNewsAgentRoute);
+app.use('/api/market-gpt', marketGptRoute);
+app.use('/api/learning', learningLoopRoute);
+
+
 
 // Central error handler — always JSON (agent runner contract)
 // Do not swallow errors; surface real messages.

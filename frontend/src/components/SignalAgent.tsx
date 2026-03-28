@@ -1,5 +1,6 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+
 import { motion, AnimatePresence } from "framer-motion";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -142,7 +143,24 @@ const SignalAgent = () => {
   const [activeTab, setActiveTab] = useState("bulk");
   const [isRunning, setIsRunning] = useState(false);
   const [result, setResult] = useState<any | null>(null);
+
   const [error, setError] = useState<string | null>(null);
+  const [verificationDepth, setVerificationDepth] = useState(1);
+
+  useEffect(() => {
+    const fetchStats = async () => {
+      try {
+        const response = await fetch(`${API_BASE}/learning/stats`);
+        if (response.ok) {
+          const data = await response.json();
+          setVerificationDepth(data.verificationDepth || 1);
+        }
+      } catch (e) {
+        console.error("Error fetching verification depth:", e);
+      }
+    };
+    fetchStats();
+  }, []);
 
   const endpointMap: Record<string, string> = {
     bulk: `${API_BASE}/agent/bulk-deal`,
@@ -156,13 +174,16 @@ const SignalAgent = () => {
     setError(null);
     try {
       const res = await fetch(endpointMap[activeTab], {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({}),
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ verificationDepth }),
       });
       const data = await res.json();
-      if (!data.success) { setError(data.error ?? 'Agent failed'); } 
-      else { setResult(data); }
+      if (!data.success) {
+        setError(data.error ?? "Agent failed");
+      } else {
+        setResult(data);
+      }
     } catch (e: any) {
       setError(e.message);
     }
@@ -176,17 +197,47 @@ const SignalAgent = () => {
   };
 
   return (
-    <div className="glass-strong rounded-[2rem] p-8 space-y-8">
-      <div>
-        <Badge variant="outline" className="border-border/40 bg-secondary/40 px-4 py-1 text-[0.65rem] uppercase tracking-[0.32em] text-text-secondary">Advanced Signal Agent</Badge>
-        <h3 className="mt-3 font-display text-3xl text-foreground">Agentic Alpha Generation</h3>
-        <p className="mt-2 text-sm leading-7 text-text-secondary">Advanced AI agents designed to automate high-conviction analysis, from institutional bulk deals to personalized news prioritization.</p>
+    <div className="glass-strong rounded-[2rem] p-8 space-y-8 relative overflow-hidden">
+      {/* Dynamic Background Pulse based on Verification Depth */}
+      {verificationDepth > 1 && (
+        <div className="absolute top-0 right-0 w-32 h-32 bg-accent/5 rounded-full blur-[80px] animate-pulse pointer-events-none" />
+      )}
+
+      <div className="flex flex-col md:flex-row md:items-start justify-between gap-6">
+        <div>
+          <Badge variant="outline" className="border-border/40 bg-secondary/40 px-4 py-1 text-[0.65rem] uppercase tracking-[0.32em] text-text-secondary">
+            Advanced Signal Agent
+          </Badge>
+          <h3 className="mt-3 font-display text-3xl text-foreground">Agentic Alpha Generation</h3>
+          <p className="mt-2 text-sm leading-7 text-text-secondary">
+            Advanced AI agents designed to automate high-conviction analysis, from institutional bulk deals to personalized news prioritization.
+          </p>
+        </div>
+
+        <div className="flex flex-col items-end gap-2 shrink-0">
+          <div className="flex items-center gap-2">
+            <div className={`w-2 h-2 rounded-full ${verificationDepth > 1 ? "bg-warning animate-pulse" : "bg-success"}`} />
+            <span className="text-[10px] uppercase tracking-widest font-bold text-text-secondary">
+              System Intelligence State
+            </span>
+          </div>
+          <Badge variant="outline" className={`rounded-full px-3 py-1 text-[9px] uppercase tracking-widest ${verificationDepth > 1 ? "border-warning/30 bg-warning/5 text-warning" : "border-success/30 bg-success/5 text-success"}`}>
+            {verificationDepth > 1 ? `Reinforcement Mode (${verificationDepth}x Depth)` : "Standard Grounding"}
+          </Badge>
+        </div>
       </div>
 
       <div className="flex flex-wrap gap-3">
         {TABS.map((tab) => (
-          <button key={tab.id} onClick={() => handleTabChange(tab.id)}
-            className={`flex items-center gap-2 rounded-2xl border px-4 py-2.5 text-sm transition-all duration-300 ${activeTab === tab.id ? 'border-accent/30 bg-accent/10 text-foreground' : 'border-border/30 bg-secondary/20 text-text-secondary hover:border-border/50'}`}>
+          <button
+            key={tab.id}
+            onClick={() => handleTabChange(tab.id)}
+            className={`flex items-center gap-2 rounded-2xl border px-4 py-2.5 text-sm transition-all duration-300 ${
+              activeTab === tab.id
+                ? "border-accent/30 bg-accent/10 text-foreground"
+                : "border-border/30 bg-secondary/20 text-text-secondary hover:border-border/50"
+            }`}
+          >
             <tab.icon size={14} />
             {tab.label}
           </button>
@@ -194,27 +245,44 @@ const SignalAgent = () => {
       </div>
 
       <div className="rounded-[1.5rem] border border-border/30 bg-secondary/20 p-4">
-        <p className="text-sm text-text-secondary">{TABS.find(t => t.id === activeTab)?.description}</p>
+        <p className="text-sm text-text-secondary">{TABS.find((t) => t.id === activeTab)?.description}</p>
       </div>
 
       <Button onClick={handleRun} disabled={isRunning} className="h-12 rounded-2xl px-8 w-full md:w-auto">
-        {isRunning ? <><Loader2 size={16} className="animate-spin mr-2" />Agent running...</> : <>Run Agent</>}
+        {isRunning ? (
+          <>
+            <Loader2 size={16} className="animate-spin mr-2" />
+            Agent running...
+          </>
+        ) : (
+          <>Run Agent</>
+        )}
       </Button>
 
       <AnimatePresence mode="wait">
         {result && (
-          <motion.div key={activeTab + 'result'} initial={{ opacity: 0, y: 16, filter: 'blur(8px)' }} animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }} exit={{ opacity: 0 }} transition={{ duration: 0.5 }} className="space-y-6">
+          <motion.div
+            key={activeTab + "result"}
+            initial={{ opacity: 0, y: 16, filter: "blur(8px)" }}
+            animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.5 }}
+            className="space-y-6"
+          >
             <StepTrace trace={result.reasoningTrace} />
-            {activeTab === 'bulk' && <BulkDealResult data={result.outputs} />}
-            {activeTab === 'technical' && <TechnicalResult data={result.outputs} />}
-            {activeTab === 'portfolio' && <PortfolioNewsResult data={result.outputs} />}
+            {activeTab === "bulk" && <BulkDealResult data={result.outputs} />}
+            {activeTab === "technical" && <TechnicalResult data={result.outputs} />}
+            {activeTab === "portfolio" && <PortfolioNewsResult data={result.outputs} />}
           </motion.div>
         )}
       </AnimatePresence>
 
-      {error && <p className="text-sm text-critical rounded-2xl border border-critical/20 bg-critical/5 p-4">{error}</p>}
+      {error && (
+        <p className="text-sm text-critical rounded-2xl border border-critical/20 bg-critical/5 p-4">{error}</p>
+      )}
     </div>
   );
 };
 
 export default SignalAgent;
+SignalAgent;
