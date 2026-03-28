@@ -130,9 +130,15 @@ Self-correction mechanism — the platform's technical differentiator.
 - **Accuracy Dashboard** (`GET /api/learning/stats`): Computes real-time accuracy from logged outcomes, triggers `verificationDepth: 3` (triple-checking mode) when accuracy drops below 80%
 - **Frontend UI**: Weekly accuracy trend chart (Recharts), prediction log with add/edit, overall accuracy display
 
----
+### 9. Input-Agnostic Scenario Engine
+A generative, triple-axis analysis engine that works on any signal.
 
-## Backend API Routes
+- **The 'Any-Signal' Parser**: Accepts specific manual triggers (e.g., judges' prompts) or automatically picks the highest-impact signal from the system cache.
+- **Triple-Axis Analysis**: Automatically evaluates any signal through three core fiduciary lenses:
+    - **Bulk/Block Perspective**: Deconstructs institutional and promoter activity.
+    - **Technical Perspective**: Identifies immediate support and resistance levels.
+    - **Portfolio Perspective**: Assesses risk impact for a diversified retail investor.
+- **Self-Correction Audit**: Every surprise scenario generates a Prediction Log. When the market outcome is tracked later, the 'Self-Correction Loop' audits the performance, proving the system learns even from unexpected events.
 
 | Endpoint | Method | Description |
 | :--- | :--- | :--- |
