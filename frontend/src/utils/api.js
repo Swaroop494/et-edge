@@ -174,3 +174,38 @@ export async function runMarketGPT(query, userHoldings) {
     return null;
   }
 }
+
+/**
+ * Trigger Agentic Scenario Generation for high-impact signals.
+ */
+export async function generateScenarios() {
+  try {
+    const headers = await getAuthHeaders();
+    const response = await fetch(`${API_BASE}/scenarios/generate`, {
+      method: "POST",
+      headers
+    });
+    return await response.json();
+  } catch (err) {
+    console.error("generateScenarios error:", err.message);
+    return null;
+  }
+}
+
+/**
+ * Perform manual Audit (Track Actual) for the learning loop.
+ */
+export async function auditScenario(logId, actualChange) {
+  try {
+    const headers = await getAuthHeaders();
+    const response = await fetch(`${API_BASE}/scenarios/audit`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ logId, actualChange })
+    });
+    return await response.json();
+  } catch (err) {
+    console.error("auditScenario error:", err.message);
+    return null;
+  }
+}

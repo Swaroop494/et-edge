@@ -15,12 +15,12 @@ const Landing = () => {
       <CursorGlow />
       <RocketHero />
       
-      {/* Particle Dissolve Transition Layer */}
+      {/* Visual Particle Dissolve Layer — Creating the illusion of the gradient background 'fragmenting' into the black section below */}
       <div 
-        className="particle-dissolve-zone relative z-10 w-full h-[250px] -mt-[125px] overflow-hidden pointer-events-none"
+        className="particle-dissolve-zone relative z-10 w-full h-[300px] pointer-events-none"
         style={{
-          backgroundImage: `url("data:image/svg+xml,%3Csvg width='100' height='100' viewBox='0 0 100 100' xmlns='http://www.w3.org/2000/svg'%3E%3Ccircle cx='10' cy='10' r='1' fill='%2300ffcc' opacity='0.6' /%3E%3Ccircle cx='30' cy='40' r='1.5' fill='%237000ff' opacity='0.4' /%3E%3Ccircle cx='50' cy='15' r='1' fill='%2300ffcc' opacity='0.3' /%3E%3Ccircle cx='70' cy='60' r='2' fill='%237000ff' opacity='0.5' /%3E%3Ccircle cx='85' cy='25' r='1' fill='%2300ffcc' opacity='0.4' /%3E%3Ccircle cx='15' cy='80' r='1.5' fill='%237000ff' opacity='0.3' /%3E%3Ccircle cx='45' cy='90' r='1' fill='%2300ffcc' opacity='0.2' /%3E%3Ccircle cx='95' cy='75' r='1.5' fill='%237000ff' opacity='0.4' /%3E%3C/svg%3E")`,
-          backgroundSize: "120px 120px",
+          backgroundImage: `url("data:image/svg+xml,%3Csvg width='400' height='400' viewBox='0 0 400 400' xmlns='http://www.w3.org/2000/svg'%3E%3C!-- Neon Cyan Particles --%3E%3Ccircle cx='20' cy='20' r='1.2' fill='%2300ffcc' opacity='0.9' /%3E%3Ccircle cx='150' cy='45' r='0.8' fill='%2300ffcc' opacity='0.4' /%3E%3Ccircle cx='340' cy='12' r='2' fill='%2300ffcc' opacity='0.8' /%3E%3Ccircle cx='80' cy='110' r='1' fill='%2300ffcc' opacity='0.3' /%3E%3Ccircle cx='260' cy='160' r='1.5' fill='%2300ffcc' opacity='0.6' /%3E%3Ccircle cx='45' cy='280' r='0.5' fill='%2300ffcc' opacity='0.2' /%3E%3Ccircle cx='310' cy='220' r='1.2' fill='%2300ffcc' opacity='0.5' /%3E%3Ccircle cx='190' cy='310' r='2.2' fill='%2300ffcc' opacity='0.7' /%3E%3Ccircle cx='75' cy='350' r='0.9' fill='%2300ffcc' opacity='0.3' /%3E%3Ccircle cx='360' cy='290' r='1.4' fill='%2300ffcc' opacity='0.5' /%3E%3C!-- Electric Violet Particles --%3E%3Ccircle cx='380' cy='60' r='1.5' fill='%237000ff' opacity='0.8' /%3E%3Ccircle cx='210' cy='85' r='1.1' fill='%237000ff' opacity='0.5' /%3E%3Ccircle cx='60' cy='30' r='0.9' fill='%237000ff' opacity='0.3' /%3E%3Ccircle cx='120' cy='210' r='2' fill='%237000ff' opacity='0.7' /%3E%3Ccircle cx='330' cy='320' r='1' fill='%237000ff' opacity='0.4' /%3E%3Ccircle cx='25' cy='180' r='1.8' fill='%237000ff' opacity='0.6' /%3E%3Ccircle cx='170' cy='390' r='0.8' fill='%237000ff' opacity='0.2' /%3E%3Ccircle cx='390' cy='370' r='1.5' fill='%237000ff' opacity='0.5' /%3E%3Ccircle cx='120' cy='340' r='0.7' fill='%237000ff' opacity='0.3' /%3E%3Ccircle cx='280' cy='40' r='1.2' fill='%237000ff' opacity='0.4' /%3E%3C/svg%3E")`,
+          backgroundSize: "200px 200px",
           maskImage: "linear-gradient(to bottom, black 0%, transparent 100%)",
           WebkitMaskImage: "linear-gradient(to bottom, black 0%, transparent 100%)",
         }}

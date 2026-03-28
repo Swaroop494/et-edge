@@ -12,18 +12,17 @@ const agentRoute = require('./routes/agent');
 const bulkDealAgentRoute = require('./routes/bulkDealAgent');
 const technicalAgentRoute = require('./routes/technicalAgent');
 const portfolioNewsAgentRoute = require('./routes/portfolioNewsAgent');
+const scenariosRoute = require('./routes/scenarios');
 const marketGptRoute = require('./routes/marketGpt');
 const learningLoopRoute = require('./routes/learningLoop');
-
-
 
 const app = express();
 const PORT = process.env.PORT || 5000;
 const NEWS_FETCH_INTERVAL_MS = 900000;
 
-// Middleware
 app.use(express.json());
 app.use(corsMiddleware);
+
 app.locals.newsFetchIntervalMs = NEWS_FETCH_INTERVAL_MS;
 app.locals.newsCache = {
     data: null,
@@ -42,6 +41,7 @@ app.use('/api/agent/technical', technicalAgentRoute);
 app.use('/api/agent/portfolio-news', portfolioNewsAgentRoute);
 app.use('/api/market-gpt', marketGptRoute);
 app.use('/api/learning', learningLoopRoute);
+app.use('/api/scenarios', scenariosRoute);
 
 
 
