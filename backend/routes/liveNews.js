@@ -4,6 +4,7 @@ const router = express.Router();
 const fs = require('fs');
 const path = require('path');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
+const fetch = (...args) => import('node-fetch').then(({default: fetch}) => fetch(...args));
 
 const CACHE_FILE = path.join(__dirname, "../data/news_cache.json");
 const CACHE_DURATION_MS = 15 * 60 * 1000; // 15 minutes
@@ -30,6 +31,7 @@ router.get('/', async (req, res) => {
         console.warn("Cache read error, continuing to fresh fetch:", cacheErr.message);
     }
 
+    let articles = [];
     try {
         const apiKey = process.env.NEWS_API_KEY || process.env.NEXT_PUBLIC_NEWS_API_KEY;
         if (!apiKey) throw new Error("NewsAPI Key is missing");
@@ -41,7 +43,7 @@ router.get('/', async (req, res) => {
         if (!newsResponse.ok) throw new Error(`NewsAPI error: ${newsResponse.status}`);
 
         const data = await newsResponse.json();
-        const articles = data.articles || [];
+        articles = data.articles || [];
         if (articles.length === 0) throw new Error("No articles found");
 
         // Task 1: Batch Analysis with Gemini 2.5 Flash Lite
@@ -50,7 +52,7 @@ router.get('/', async (req, res) => {
         }
         const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
         const model = genAI.getGenerativeModel({ 
-            model: "gemini-2.5-flash-lite",
+            model: "gemini-2.0-flash-lite",
             systemInstruction: "You are an Indian financial news analyst. Analyze the provided list of news titles and descriptions. For each one, determine the market sentiment (Positive, Negative, or Neutral) and an impact score (0-100). Return exactly a JSON array of objects with fields: title (original), sentiment (string), impactScore (number), and reasoning (one short simple English sentence)."
         });
 
@@ -77,7 +79,17 @@ router.get('/', async (req, res) => {
         return res.status(200).json(richArticles);
 
     } catch (err) {
-        console.error("Batch news analysis failed, using fallback:", err.message);
+        console.error("Batch news analysis failed:", err.message);
+        // Resilient merge: If we already have articles from newsapi, use them with neutral sentiment
+        if (typeof articles !== 'undefined' && articles.length > 0) {
+            const basicArticles = articles.map(article => ({
+                ...article,
+                source: article.source.name || "Unknown",
+                aiAnalysis: { sentiment: "Neutral", impactScore: 50, reasoning: "AI analysis was unavailable for this update." }
+            }));
+            return res.status(200).json(basicArticles);
+        }
+
         try {
             const mockDataPath = path.join(__dirname, "../../data/radar_events.json");
             const rawMock = JSON.parse(fs.readFileSync(mockDataPath, 'utf8')).events;

@@ -53,8 +53,12 @@ const Dashboard = () => {
     const load = async () => {
       try {
         const data = await apiFetch<DashData>("/api/dashboard");
-        setDashData(data);
-        setUsingFallback(false);
+        if (data) {
+          setDashData(data);
+          setUsingFallback(false);
+        } else {
+          setUsingFallback(true);
+        }
       } catch (e) {
         console.error("Dashboard fetch failed:", e);
         setUsingFallback(true);

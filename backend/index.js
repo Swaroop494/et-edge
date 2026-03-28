@@ -21,8 +21,8 @@ const app = express();
 const PORT = process.env.PORT || 5000;
 const NEWS_FETCH_INTERVAL_MS = 900000;
 
-app.use(express.json());
 app.use(corsMiddleware);
+app.use(express.json());
 
 app.locals.newsFetchIntervalMs = NEWS_FETCH_INTERVAL_MS;
 app.locals.newsCache = {

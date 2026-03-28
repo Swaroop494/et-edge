@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { CheckCircle2, Circle, Loader2, AlertTriangle, TrendingUp, BarChart3 } from "lucide-react";
+import { apiFetch } from "@/lib/api";
 
 import { API_BASE } from "@/lib/api";
 
@@ -149,14 +150,9 @@ const SignalAgent = () => {
 
   useEffect(() => {
     const fetchStats = async () => {
-      try {
-        const response = await fetch(`${API_BASE}/api/learning/stats`);
-        if (response.ok) {
-          const data = await response.json();
-          setVerificationDepth(data.verificationDepth || 1);
-        }
-      } catch (e) {
-        console.error("Error fetching verification depth:", e);
+      const data = await apiFetch<any>("/api/learning/stats");
+      if (data) {
+        setVerificationDepth(data.verificationDepth || 1);
       }
     };
     fetchStats();

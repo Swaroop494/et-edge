@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { API_BASE } from "@/lib/api";
+import { API_BASE, apiFetch } from "@/lib/api";
 import { BrainCircuit, Zap, CheckCircle2, TrendingUp, Info } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 
@@ -16,21 +16,14 @@ const LearningProgress = () => {
 
   useEffect(() => {
     const fetchStats = async () => {
-      try {
-        const response = await fetch(`${API_BASE}/api/learning/stats`);
-        if (response.ok) {
-          const data = await response.json();
-          setStats(data);
-          setUsingFallback(false);
-        } else {
-          setUsingFallback(true);
-        }
-      } catch (error) {
-        console.error("Error fetching learning stats:", error);
+      const data = await apiFetch<any>("/api/learning/stats");
+      if (data) {
+        setStats(data);
+        setUsingFallback(false);
+      } else {
         setUsingFallback(true);
-      } finally {
-        setIsLoading(false);
       }
+      setIsLoading(false);
     };
 
     fetchStats();
