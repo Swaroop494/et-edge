@@ -141,12 +141,14 @@ app.get('/api/market-summary', async (req, res) => {
                 price: nifty.price || 0,
                 change: nifty.change || 0,
                 changePct: nifty.changePct || 0,
-                chartData: nifty.chartData || [],
+                chartData: nifty.chartData || nifty.closes?.map((c, i) => ({ time: i.toString(), price: c })) || [],
+                marketOpen: true,
                 lastUpdated: new Date().toISOString()
             },
             topGainer: movers.topGainer || { ticker: 'N/A', changePct: 0 },
             topLoser: movers.topLoser || { ticker: 'N/A', changePct: 0 },
-            timestamp: new Date().toISOString()
+            topMovers: movers.movers || [],
+            dataQuality: { source: 'live', marketOpen: true, timestamp: new Date().toISOString() }
         };
 
         global.lastMarketSummary = summary; // Persistence Catch

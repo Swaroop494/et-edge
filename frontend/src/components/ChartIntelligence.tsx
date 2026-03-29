@@ -81,7 +81,7 @@ const ChartIntelligence = ({ eventId: _eventId }: ChartIntelligenceProps) => {
     confidence: displaySource.confidenceScore || 78,
     portfolioSignal: impactValue,
     positiveFactors: displaySource.positiveFactors || (impactValue === 'positive' ? [displaySource.whyItMatters || "Structural momentum detected."] : ["Consolidation indicators present."]),
-    negativeFactors: displaySource.negativeFactors || (impactValue === 'negative' ? ["Input Cost Inflation", "Institutional Sell-off", displaySource.whyItMatters] : ["No immediate high-risk inhibitors detected."]),
+    negativeFactors: displaySource.negativeFactors || (impactValue === 'negative' || impactValue === 'volatile' ? [displaySource.aiAnalysis?.reasoning || displaySource.whyItMatters || "Structural headwinds identified."] : ["No immediate high-risk inhibitors detected."]),
     finalDecision: displaySource.finalDecision || ("Strategic verdict for ET Edge: " + impactValue.toUpperCase() + " exposure calibration initiated. Support holding at technical levels."),
   };
 

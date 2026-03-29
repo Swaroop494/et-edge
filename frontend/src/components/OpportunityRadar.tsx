@@ -9,7 +9,11 @@ interface Event {
   title: string;
   description?: string;
   category: string;
+  macroSector: string;
+  microSector: string;
   impact: "Positive" | "Negative" | "Volatile" | "mixed" | "positive";
+  confidence?: number;
+  aiAnalysis?: any;
 }
 
 interface OpportunityRadarProps {
@@ -27,17 +31,20 @@ const OpportunityRadar = ({ selectedEventId, onSelectEvent }: OpportunityRadarPr
         const res = await fetch(`http://localhost:5500/api/live-news?nocache=${Date.now()}`);
         const data = await res.json();
         
-        if (data && data.length >= 5) {
-          const mapped = data.map((item: any, idx: number) => ({
-            // Generate unique stable ID by combining index and slug
-            id: `${idx}_${item.title.toLowerCase().replace(/\s+/g, '-').substring(0, 30)}`,
+        if (data && Array.isArray(data) && data.length > 0) {
+          const mapped = data.map((item: any) => ({
+            id: item.id || `EVT_${Date.now()}_${Math.random()}`,
             title: item.title,
             description: item.description,
-            category: item.aiAnalysis?.sector || "Market",
-            impact: item.aiAnalysis?.sentiment || "Volatile"
+            category: item.aiAnalysis?.macroSector || "Market",
+            macroSector: item.aiAnalysis?.macroSector || "Market",
+            microSector: item.aiAnalysis?.microSector || "General Equity",
+            impact: item.aiAnalysis?.sentiment || "Volatile",
+            confidence: item.aiAnalysis?.confidence || 78,
+            aiAnalysis: item.aiAnalysis
           }));
           setEvents(mapped);
-          setIsLoading(false); // SUCCESS: Clear loading only on full data
+          setIsLoading(false); // SUCCESS: Clear loading only on full data from localhost:5500
           
           if (mapped.length > 0 && !selectedEventId) {
             onSelectEvent(mapped[0].id, mapped[0]);
@@ -50,54 +57,12 @@ const OpportunityRadar = ({ selectedEventId, onSelectEvent }: OpportunityRadarPr
     fetchNews();
   }, []);
 
-  const selectedEvent = events.find(e => e.id === selectedEventId) || events[0] || { id: 'none', title: "Initializing...", category: "General" };
+  const selectedEvent = events.find(e => e.id === selectedEventId) || events[0] || { id: 'none', title: "Initializing...", category: "General", macroSector: "General", microSector: "General" };
 
   return (
     <div className="flex h-screen w-full bg-[#020617] text-white overflow-hidden">
-      {/* LEFT CONTENT: HERO + GRID */}
-      <div className="flex-1 flex flex-col overflow-y-auto no-scrollbar">
-        {/* HERO SECTION */}
-        <section className="px-12 pt-20 pb-12 flex flex-col lg:flex-row gap-12 items-start relative overflow-hidden">
-           <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-blue-600/10 blur-[120px] -z-10 rounded-full" />
-           
-           <div className="flex-1 max-w-2xl">
-              <Badge variant="outline" className="border-white/10 text-[10px] uppercase tracking-[0.3em] font-bold text-gray-400 mb-6">
-                Event Intelligence · AI Accuracy 72% — 78%
-              </Badge>
-              <h1 className="text-6xl md:text-7xl font-display font-medium leading-[1.05] tracking-tight mb-8">
-                See the <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-purple-400">event</span> before it becomes everyone else&apos;s story.
-              </h1>
-              <p className="text-gray-400 text-lg leading-relaxed max-w-xl">
-                ET Edge now begins with event-driven reasoning — detect what changed, understand why it matters, and follow the impact through your decisions.
-              </p>
-           </div>
-
-           {/* FEATURED CARD */}
-           {selectedEvent.id !== 'none' && (
-              <motion.div 
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                key={selectedEvent.id}
-                className="w-full lg:w-[450px] aspect-[4/3] glass-strong rounded-[2.5rem] border border-white/10 p-8 shadow-2xl relative group shrink-0"
-              >
-                  <div className="flex justify-between items-start mb-6">
-                    <Badge className="bg-white/5 border-white/10 text-accent text-[10px] uppercase tracking-widest px-4 py-2">
-                       {selectedEvent.category}
-                    </Badge>
-                    <div className="w-2 h-2 rounded-full bg-accent animate-pulse" />
-                  </div>
-                  <h3 className="text-3xl font-display font-medium leading-tight mb-6 line-clamp-4">
-                    {selectedEvent.title}
-                  </h3>
-                  <div className="absolute bottom-10 left-8 right-8 flex items-center justify-between border-t border-white/5 pt-6">
-                     <p className="text-xs uppercase tracking-widest text-text-secondary font-bold">In-Depth Analysis</p>
-                     <div className="w-10 h-10 rounded-full bg-white/5 border border-white/10 flex items-center justify-center group-hover:bg-accent/20 group-hover:border-accent/40 transition-all">
-                        <TrendingUp size={16} className="text-accent" />
-                     </div>
-                  </div>
-              </motion.div>
-           )}
-        </section>
+      {/* LEFT CONTENT: GRID ONLY */}
+      <div className="flex-1 flex flex-col overflow-y-auto no-scrollbar pt-10">
 
         {/* BOTTOM SECTION: MORE EVENTS GRID */}
         <section className="px-12 pb-24">
@@ -109,7 +74,7 @@ const OpportunityRadar = ({ selectedEventId, onSelectEvent }: OpportunityRadarPr
            {isLoading ? (
              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                 {[1,2,3,4].map(i => (
-                  <div key={i} className="h-64 glass-strong rounded-3xl animate-pulse" />
+                   <div key={i} className="h-64 glass-strong rounded-3xl animate-pulse" />
                 ))}
              </div>
            ) : (
@@ -126,14 +91,21 @@ const OpportunityRadar = ({ selectedEventId, onSelectEvent }: OpportunityRadarPr
                    )}
                  >
                    <div className="space-y-4">
-                     <p className="text-[10px] uppercase tracking-widest text-gray-500 font-bold">{event.category}</p>
+                     <div className="flex flex-wrap gap-2 mb-3">
+                        <Badge className="bg-accent text-black text-[8px] uppercase tracking-widest px-2 py-1 font-black shrink-0">
+                          {event.macroSector}
+                        </Badge>
+                        <Badge variant="outline" className="border-white/10 text-white/40 text-[8px] uppercase tracking-widest px-2 py-1 font-medium shrink-0">
+                          {event.microSector}
+                        </Badge>
+                     </div>
                      <h4 className="text-lg font-medium leading-snug line-clamp-3">{event.title}</h4>
                    </div>
                    <div className="flex items-center justify-between pt-4 border-t border-white/5">
-                      <span className="text-[10px] uppercase tracking-widest text-accent font-black">Analyze →</span>
+                      <span className="text-[10px] uppercase tracking-widest text-accent font-black">Analyze Trace →</span>
                       <div className={cn(
                         "w-1.5 h-1.5 rounded-full",
-                        (event.impact === 'Positive' || event.impact === 'positive') ? 'bg-accent' : 'bg-warning'
+                        (event.impact?.toLowerCase() === 'positive') ? 'bg-accent' : (event.impact?.toLowerCase() === 'negative' ? 'bg-red-400' : 'bg-warning')
                       )} />
                    </div>
                  </div>
@@ -144,78 +116,47 @@ const OpportunityRadar = ({ selectedEventId, onSelectEvent }: OpportunityRadarPr
       </div>
 
       {/* RIGHT SIDEBAR: STORY FLOW */}
-      <div className="w-[420px] bg-[#020617] border-l border-white/10 flex flex-col h-full shadow-[-20px_0_60px_rgba(0,0,0,0.5)] z-20">
-         <div className="p-10 border-b border-white/5">
+      <div className="w-[420px] bg-[#020617] border-l border-white/10 flex flex-col h-screen fixed right-0 top-0 shadow-[-20px_0_60px_rgba(0,0,0,0.5)] z-50">
+         <div className="p-10 border-b border-white/5 shrink-0">
             <h2 className="text-[10px] uppercase tracking-[0.4em] font-black text-accent mb-2">Neural Story Flow</h2>
-            <p className="text-gray-500 text-xs">Structural Decomposition V4.2</p>
+            <p className="text-gray-500 text-[10px]">Structural Decomposition V4.2</p>
          </div>
 
-         <div className="flex-1 overflow-y-auto p-10 no-scrollbar">
-            {selectedEvent.id !== 'none' ? (
-              <div className="space-y-12 animate-in fade-in slide-in-from-bottom-8 duration-700">
-                {/* 1. What Happened */}
-                <div className="relative pl-8 border-l border-accent/20">
-                  <div className="absolute -left-[5px] top-0 w-2.5 h-2.5 rounded-full bg-accent shadow-[0_0_15px_rgba(24,255,255,0.8)]" />
-                  <label className="block text-[10px] text-gray-500 uppercase font-black tracking-widest mb-4">Core Event Signal</label>
-                  <p className="text-lg text-white font-medium leading-relaxed">
-                    {selectedEvent.title}
-                  </p>
-                </div>
+         <div className="flex-1 overflow-y-auto p-10 space-y-12 no-scrollbar pb-32">
+            {/* 1. Core Signal */}
+            <div className="relative pl-8 border-l border-accent/20">
+              <div className="absolute -left-[5px] top-0 w-2.5 h-2.5 rounded-full bg-accent shadow-[0_0_15px_#18ffff]" />
+              <label className="block text-[9px] text-gray-500 uppercase font-black mb-3">Core Event Signal</label>
+              <p className="text-lg text-white font-medium leading-snug">{selectedEvent.title}</p>
+            </div>
 
-                {/* 2. Why It Matters */}
-                <div className="relative pl-8 border-l border-purple-500/20">
-                  <div className="absolute -left-[5px] top-0 w-2.5 h-2.5 rounded-full bg-purple-500 shadow-[0_0_15px_rgba(168,85,247,0.8)]" />
-                  <label className="block text-[10px] text-gray-500 uppercase font-black tracking-widest mb-4">Neural Impact Theory</label>
-                  <p className="text-sm text-gray-400 leading-relaxed italic">
-                    {selectedEvent.description || "Synthesizing market metadata to determine structural implications for the next 48 hours..."}
-                  </p>
-                </div>
+            {/* 2. Clusters */}
+            <div className="relative pl-8 border-l border-cyan-500/20">
+              <div className="absolute -left-[5px] top-0 w-2.5 h-2.5 rounded-full bg-cyan-500" />
+              <label className="block text-[9px] text-gray-500 uppercase font-black mb-3">Affected Clusters</label>
+              <p className="text-sm font-bold text-cyan-400">{selectedEvent.macroSector} → {selectedEvent.microSector}</p>
+            </div>
 
-                {/* 3. Indicators Grid */}
-                <div className="grid grid-cols-2 gap-4 pt-4">
-                  <div className="bg-white/5 p-6 rounded-3xl border border-white/5">
-                    <label className="block text-[9px] text-gray-500 uppercase tracking-widest font-black mb-3">Confidence</label>
-                    <span className="text-accent font-display font-medium text-4xl">
-                      78<span className="text-xl">%</span>
-                    </span>
-                  </div>
-                  <div className="bg-white/5 p-6 rounded-3xl border border-white/5">
-                    <label className="block text-[9px] text-gray-500 uppercase tracking-widest font-black mb-3">Impact</label>
-                    <span className={cn(
-                      "text-xl font-black uppercase tracking-tighter",
-                      (selectedEvent.impact === 'Positive' || selectedEvent.impact === 'positive') ? "text-accent" : "text-warning"
-                    )}>
-                      {(selectedEvent.impact === 'Positive' || selectedEvent.impact === 'positive') ? "Bullish" : "Volatile"}
-                    </span>
-                  </div>
-                </div>
+            {/* 3. Neural Theory */}
+            <div className="relative pl-8 border-l border-purple-500/20">
+              <div className="absolute -left-[5px] top-0 w-2.5 h-2.5 rounded-full bg-purple-500" />
+              <label className="block text-[9px] text-gray-500 uppercase font-black mb-3">Neural Impact Theory</label>
+              <p className="text-sm text-gray-400 leading-relaxed italic">{selectedEvent.description || "Synthesizing market metadata to determine structural implications for the next 48 hours..."}</p>
+            </div>
 
-                {/* 4. Deep Reasoning */}
-                <div className="bg-accent/5 border border-accent/10 rounded-[2rem] p-8 space-y-4">
-                   <div className="flex items-center gap-3">
-                      <div className="w-1.5 h-1.5 bg-accent rounded-full animate-ping" />
-                      <span className="text-[10px] uppercase tracking-widest text-accent font-black">Strategy Agent</span>
-                   </div>
-                   <p className="text-xs text-gray-400 leading-7">
-                      ET Edge detected abnormal institutional accumulation in the <strong>{selectedEvent.category}</strong> sector. 
-                      Logical patterns suggest a transition from consolidation to structural momentum. Recommend position calibration.
-                   </p>
-                </div>
+            {/* 4. Grid */}
+            <div className="grid grid-cols-2 gap-4">
+              <div className="bg-white/5 p-5 rounded-2xl border border-white/5 text-center">
+                <span className="block text-[8px] text-gray-500 uppercase mb-1">Confidence</span>
+                <span className="text-2xl font-display text-accent">{selectedEvent.confidence || 78}%</span>
               </div>
-            ) : (
-              <div className="h-full flex flex-col items-center justify-center text-center">
-                <div className="w-16 h-16 border border-dashed border-gray-700 rounded-full mb-6 border-t-accent animate-spin" />
-                <p className="text-[10px] text-gray-500 uppercase tracking-[0.3em] font-black leading-relaxed text-center">
-                  Initializing Neural Link<br/>Select Node to Decompose
-                </p>
+              <div className="bg-white/5 p-5 rounded-2xl border border-white/5 text-center">
+                <span className="block text-[8px] text-gray-500 uppercase mb-1">Impact</span>
+                <span className={`text-sm font-black ${selectedEvent.impact?.toLowerCase() === 'positive' ? 'text-accent' : (selectedEvent.impact?.toLowerCase() === 'negative' ? 'text-red-400' : 'text-warning')}`}>
+                  {selectedEvent.impact?.toLowerCase() === 'positive' ? 'BULLISH' : (selectedEvent.impact?.toLowerCase() === 'negative' ? 'BEARISH' : 'VOLATILE')}
+                </span>
               </div>
-            )}
-         </div>
-
-         <div className="p-10 border-t border-white/5 text-center">
-            <p className="text-[8px] uppercase tracking-[0.4em] text-gray-600 font-black">
-              Fiduciary Node Verified · Level 4 Intelligence
-            </p>
+            </div>
          </div>
       </div>
     </div>

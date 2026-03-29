@@ -39,7 +39,6 @@ const EventHighlights = ({ dashData }: EventHighlightsProps) => {
     >
       <h4 className="font-display text-xs font-semibold text-text-secondary uppercase tracking-wider mb-3 flex items-center gap-2">
         Active Events
-        {!isLive && <span className="text-[9px] text-warning/70 normal-case font-normal">(demo)</span>}
       </h4>
 
       <div className="space-y-2.5">

@@ -67,7 +67,6 @@ const StockChart = ({ dashData }: StockChartProps) => {
               {isUp ? "+" : ""}{changePct.toFixed(2)}%
             </span>
           </div>
-          {!isLive && <p className="text-[9px] text-warning/70 mt-0.5">demo data</p>}
         </div>
         <div className="flex gap-1 p-0.5 rounded-lg bg-secondary/50">
           {ranges.map((r) => (

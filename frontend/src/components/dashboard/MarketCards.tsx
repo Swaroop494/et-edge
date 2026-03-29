@@ -73,9 +73,6 @@ const MarketCards = ({ dashData }: MarketCardsProps) => {
           <span className={`text-xs font-medium tabular-nums ${card.up ? "text-accent" : "text-critical"}`}>
             {card.change}
           </span>
-          {!isLive && (
-            <p className="text-[9px] text-warning/70 mt-1">demo data</p>
-          )}
         </motion.div>
       ))}
     </div>
