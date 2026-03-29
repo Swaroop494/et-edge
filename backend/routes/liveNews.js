@@ -1,9 +1,4 @@
-// ET Edge — Live News Route. Returns latest Indian market headlines from NewsAPI with fallback to mock data.
-const express = require('express');
-const router = express.Router();
-const fs = require('fs');
-const path = require('path');
-const { GoogleGenerativeAI } = require('@google/generative-ai');
+const { callAI } = require('../services/aiService');
 const fetch = (...args) => import('node-fetch').then(({default: fetch}) => fetch(...args));
 
 const CACHE_DURATION_MS = 15 * 60 * 1000; // 15 minutes
@@ -55,21 +50,16 @@ router.get('/', async (req, res) => {
         articles = data.articles || [];
         if (articles.length === 0) throw new Error("No articles found");
 
-        // 2. BATCH INTELLIGENCE: GEMINI 2.0 FLASH
-        const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
-        const model = genAI.getGenerativeModel({ 
-            model: "gemini-2.0-flash",
-            systemInstruction: "Analyze the following news batch. For each item, you MUST provide a reasoning (exactly 2 sentences) and a source (e.g., [Source: Reuters]). Return valid JSON array of objects with fields: title, sentiment, impactScore, reasoning, and source."
-        });
-
+        // 2. BATCH INTELLIGENCE: GEMINI 2.0 FLASH (via callAI for failover)
         const batchPrompt = `Analyze these 5 news items and return a JSON array: ${JSON.stringify(articles.map(a => ({ title: a.title, description: a.description })))}`;
-
+        
         // Task 3: Rate Limiting Queue (Wait 2s if multiple fast refreshes occur before cache)
         await sleep(2000); 
 
-        const result = await model.generateContent(batchPrompt);
-        const analysisText = result.response.text().replace(/```json/g, '').replace(/```/g, '').trim();
-        const analyzedData = JSON.parse(analysisText);
+        const analyzedData = await callAI(
+            "Analyze the following news batch. For each item, you MUST provide a reasoning (exactly 2 sentences) and a source (e.g., [Source: Reuters]). Return valid JSON array of objects with fields: title, sentiment, impactScore, reasoning, and source.",
+            batchPrompt
+        );
 
         // Merge news source data with AI analysis
         const richArticles = articles.map((article, index) => ({

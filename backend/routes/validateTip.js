@@ -28,18 +28,8 @@ router.post('/', async (req, res, next) => {
       });
     }
 
-    const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-    const flashModel = genAI.getGenerativeModel({ 
-      model: 'gemini-2.0-flash',
-      systemInstruction: "Every claim MUST include a bracketed source, e.g., [Source: NSE Filing Q3 2025]. If no source is found, use [Source: Institutional Data Feed]."
-    });
-    const proModel = genAI.getGenerativeModel({ 
-      model: 'gemini-1.5-pro',
-      systemInstruction: "Every claim MUST include a bracketed source, e.g., [Source: NSE Filing Q3 2025]. If no source is found, use [Source: Institutional Data Feed]."
-    });
-
     // Step 3c — extract ticker
-    const ticker = await extractTicker(flashModel, tipText);
+    const ticker = await extractTicker(callAI, tipText);
 
     let stockData = null;
     let groundingContext = '';

@@ -3,7 +3,7 @@
 import { useEffect, useState, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { createPortal } from "react-dom";
-import { Send, Bot, User, Loader2, ShieldCheck, ExternalLink, Info, History, TrendingUp, Brain, X, Maximize2, Minimize2, ArrowRight } from "lucide-react";
+import { Send, Bot, User, Loader2, ShieldCheck, ExternalLink, Info, History, TrendingUp, Brain, X, Maximize2, Minimize2, ArrowRight, ChevronDown } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -230,9 +230,56 @@ const MarketChat = () => {
                     {msg.role === "assistant" ? <Bot size={16} /> : <User size={16} />}
                   </div>
                   <div className={`max-w-[85%] lg:max-w-[75%] space-y-4 ${msg.role === "user" ? "text-right" : "text-left"}`}>
+                    {msg.role === "assistant" && msg.impact && (
+                      <div className="flex justify-start">
+                        <Badge variant="outline" className={`rounded-xl px-3 py-1 text-[10px] uppercase tracking-widest font-black border-2 ${impactStyles[msg.impact]}`}>
+                          {msg.impact} IMPACT
+                        </Badge>
+                      </div>
+                    )}
                     <div className={`p-4 lg:p-6 rounded-[1.5rem] lg:rounded-[2rem] border shadow-xl ${msg.role === "user" ? "bg-accent text-white border-transparent" : "bg-white/5 border-white/10 text-white/90"}`}>
                       <p className="text-xs lg:text-base leading-[1.6] lg:leading-[1.8] font-medium whitespace-pre-wrap">{msg.content}</p>
+                      
+                      {msg.role === "assistant" && msg.citations && msg.citations.length > 0 && (
+                        <div className="mt-4 pt-4 border-t border-white/5 flex flex-wrap gap-2">
+                          {msg.citations.map((cite, idx) => (
+                            <Badge 
+                              key={idx} 
+                              variant="outline" 
+                              className="bg-white/5 hover:bg-white/10 text-white/40 hover:text-white border-white/10 cursor-pointer text-[10px] flex items-center gap-1.5 py-1 px-3 rounded-lg transition-all"
+                              onClick={() => window.open(cite, '_blank')}
+                            >
+                              <ExternalLink size={10} />
+                              {cite.replace(/^https?:\/\/(www\.)?/, '').split('/')[0]}
+                            </Badge>
+                          ))}
+                        </div>
+                      )}
                     </div>
+
+                    {msg.role === "assistant" && msg.reasoningTrace && msg.reasoningTrace.length > 0 && (
+                      <details className="group bg-white/5 border border-white/10 rounded-2xl overflow-hidden transition-all">
+                        <summary className="list-none cursor-pointer p-4 select-none">
+                          <div className="text-[10px] text-white/40 group-hover:text-accent font-black uppercase tracking-[0.2em] flex items-center justify-between transition-colors">
+                            <span className="flex items-center gap-2">
+                              <Brain size={12} className="text-accent" />
+                              Neural Reasoning Trace
+                            </span>
+                            <ChevronDown size={14} className="group-open:rotate-180 transition-transform duration-300" />
+                          </div>
+                        </summary>
+                        <div className="px-6 pb-6 space-y-4 border-t border-white/5 pt-4">
+                          {msg.reasoningTrace.map((step, idx) => (
+                            <div key={idx} className="relative pl-6 before:absolute before:left-0 before:top-2 before:w-1.5 before:h-1.5 before:rounded-full before:bg-accent/40">
+                              <div className="text-[9px] text-accent/50 font-bold uppercase tracking-wider mb-1">Phase {idx + 1}</div>
+                              <div className="text-xs text-white/60 leading-relaxed font-medium">
+                                {typeof step === 'string' ? step : JSON.stringify(step)}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </details>
+                    )}
                   </div>
                 </motion.div>
               ))}

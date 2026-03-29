@@ -35,8 +35,7 @@ async function refineIntelligence(logId, prediction, actual, metadata) {
   `;
 
   try {
-    const response = await model.generateContent(prompt);
-    const rawContent = response.response.text().replace(/```json/g, '').replace(/```/g, '').trim();
+    const rawContent = await callAI(systemPrompt, prompt);
     const result = JSON.parse(rawContent);
 
     // Save refinement to the original log

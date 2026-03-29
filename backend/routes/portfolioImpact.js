@@ -41,16 +41,9 @@ router.post('/', async (req, res) => {
 
     let parsedResponse;
     try {
-      const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-      const model = genAI.getGenerativeModel({ 
-        model: 'gemini-2.5-flash-lite',
-        systemInstruction: "You are a portfolio risk advisor for Indian retail investors. You only respond in valid JSON with no additional text or markdown outside the JSON. Never use financial jargon. Write everything in simple plain English a first time investor can fully understand. Never say buy or sell - only explain what the data shows. Be honest about uncertainty. Every stock in the user's holdings must appear in stockImpacts even if the impact is neutral."
-      });
-
+      const systemInstruction = "You are a portfolio risk advisor for Indian retail investors. You only respond in valid JSON with no additional text or markdown outside the JSON. Never use financial jargon. Write everything in simple plain English a first time investor can fully understand. Never say buy or sell - only explain what the data shows. Be honest about uncertainty. Every stock in the user's holdings must appear in stockImpacts even if the impact is neutral.";
       const prompt = `A market event has occurred. Assess the impact on this user's portfolio. Return ONLY a valid JSON object with exactly these fields - overallVerdict: string exactly one of Safe or Caution or Risky, riskScore: number 0-100 where 0 is completely safe and 100 is extremely risky, verdictExplanation: one plain English sentence summarising the overall situation, stockImpacts: array of objects one per stock each having symbol as string, impactLevel as string exactly Low or Medium or High, direction as string exactly Positive or Negative or Neutral, plainEnglishReason as one plain English sentence for this specific stock. User holdings: ${userHoldings.join(', ')} Event analysis: ${JSON.stringify(eventAnalysis)}`;
 
-      const result = await model.generateContent(prompt);
-      const rawText = result.response.text();
       const cleaned = rawText.replace(/```json/g, '').replace(/```/g, '').trim();
       parsedResponse = JSON.parse(cleaned);
     } catch (aiErr) {

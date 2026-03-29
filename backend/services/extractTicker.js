@@ -1,24 +1,34 @@
-const { GoogleGenerativeAI } = require('@google/generative-ai');
+const { callAI } = require('./aiService');
 
-async function extractTicker(model, tipText) {
-  if (!tipText || typeof tipText !== 'string') {
+/**
+ * Extracts a valid NSE symbol from unstructured text using OpenRouter/GPT-4o-Mini.
+ * @param {string} text - The input text containing a potential stock tip
+ * @returns {Promise<string>} - The stock ticker or 'NONE'
+ */
+async function extractTicker(text) {
+  if (!text || typeof text !== 'string') return 'NONE';
+
+  try {
+    const system = "You are a financial data extractor for Indian markets. You only output the ticker symbol.";
+    const user = `Extract the NSE stock ticker symbol from this text: "${text}". 
+    Rules: 
+    1) Return ONLY the ticker (e.g., RELIANCE), no extra text or markdown.
+    2) Common name mappings: Zomato=ZOMATO, Infosys=INFY, TCS=TCS, Reliance=RELIANCE, HDFC Bank=HDFCBANK.
+    3) If no specific Indian stock is mentioned, return: NONE.`;
+
+    const raw = await callAI(system, user);
+    const cleaned = typeof raw === 'string' ? raw : (raw.ticker || raw.symbol || JSON.stringify(raw));
+    const result = cleaned.toUpperCase().replace(/[^A-Z0-9]/g, '').trim();
+    
+    return result || 'NONE';
+  } catch (err) {
+    console.error("❌ Ticker Extraction Error:", err);
     return 'NONE';
   }
-
-  const prompt = `Extract the NSE or BSE stock ticker symbol from this text. Rules: 1) Return ONLY the ticker, nothing else, no punctuation, no .NS suffix. 2) Common name mappings: Zomato=ZOMATO, Infosys=INFY, TCS=TCS, Reliance=RELIANCE, Wipro=WIPRO. 3) If no specific Indian stock is mentioned return exactly: NONE. Text: ${tipText}`;
-
-  const result = await model.generateContent(prompt);
-  const raw = result.response.text().trim();
-  return raw.toUpperCase().replace(/[^A-Z0-9]/g, '').trim() || 'NONE';
-}
-
-function createFlashModel() {
-  const client = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-  return client.getGenerativeModel({ model: 'gemini-2.0-flash' });
 }
 
 module.exports = {
   extractTicker,
-  createFlashModel,
+  // Helper kept for backward compatibility if other modules expect a model object
+  createFlashModel: () => null 
 };
-

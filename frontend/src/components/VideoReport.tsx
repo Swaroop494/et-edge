@@ -83,16 +83,27 @@ const VideoReport = ({ data: localFallbackData }: VideoReportProps) => {
     const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
     const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
 
+    // Technical grounding of source data
+    const reasoning = marketData.reasoning || marketData.whyItMatters || marketData.outputs?.recommendation?.balancedView || "Deep technical analysis pending.";
+    const whatHappened = marketData.whatHappened || marketData.headline || marketData.symbol || "High-Impact Market Event.";
+
     const prompt = `
-      You are an ET Edge News Anchor. Convert this high-impact financial analysis into a compelling 60-second broadcast script. 
-      Start with "This is an ET Edge Alert: Market Intelligence Incoming." 
-      Tone: Fast-paced, professional, authoritative.
-      Mention specific symbols and numbers.
-      Conclude with "Invest smart, stay ahead. This is ET Edge." 
-      No markdown, just plain text script.
+      You are a Senior Financial Analyst at ET Edge. 
+      Convert the following grounded intelligence into a professional 30-second market briefing script.
       
-      ANALYSIS DATA:
-      ${JSON.stringify(marketData, null, 2)}
+      STRICT CONSTRAINTS:
+      - Use ONLY the provided 'reasoning' and 'whatHappened' strings.
+      - DO NOT generate 'creative', 'cinematic', or speculative content.
+      - DO NOT use flowery, narrative-style, or "voiceover" language.
+      - Tone: Objective, data-driven, and institutional.
+      - Start with: "Senior Analyst briefing for ET Edge:"
+      - Conclude with: "Data-driven analysis complete."
+      - Length: Optimized for a 30-second spoken delivery (approx 75-90 words).
+      - Output: Plain text only, no stage directions or markdown.
+
+      DATA SOURCES:
+      WHAT HAPPENED: ${whatHappened}
+      THE REASONING: ${reasoning}
     `.trim();
 
     try {
@@ -169,7 +180,7 @@ const VideoReport = ({ data: localFallbackData }: VideoReportProps) => {
       
       // 4. ERROR RESILIENCE: SILENT MOCK FALLBACK
       setVideoUrl(FALLBACK_VIDEO_URL);
-      setGeneratedScript("This is an ET Edge Alert: Market Intelligence Incoming. Today's deep-dive reveals significant retail-driven momentum in high-cap Indian banking stocks. We're observing abnormal volume across key technical support levels, potentially signaling a sustained rally in HDFC Bank and Reliance Industries [Source: Institutional Data Feed]. This shift in sentiment underscores a maturing investor narrative as domestic inflows reach multi-quarter highs. Stay disciplined, monitor the support levels closely, and keep your risk exposure calibrated. Invest smart, stay ahead. This is ET Edge.");
+      setGeneratedScript("Senior Analyst briefing for ET Edge: We have detected institutional momentum shifts in high-cap banking stocks as retail participation accelerates. The reasoning stems from abnormal volume spikes occurring at key structural support zones, specifically within HDFC Bank. This convergence of technical indicators suggests institutional rotation rather than generic market noise. We advise calibrating risk exposure to these established supports until further volatility compression is observed. Data-driven analysis complete.");
       setVideoStatus("ready");
       setProgress(100);
     }
@@ -178,7 +189,7 @@ const VideoReport = ({ data: localFallbackData }: VideoReportProps) => {
   const getStatusText = () => {
     switch (videoStatus) {
       case "fetching_signal": return "📡 Querying Enterprise Cache...";
-      case "generating_script": return "🧠 Drafting 60s Broadcast Script...";
+      case "generating_script": return "🧠 Drafting 30s Market Briefing...";
       case "synthesizing_video": return "🎥 Dispatching to Tavus Digital Twin...";
       case "ready": return "Video Ready for Broadcast";
       case "error": return "Generation Failed";
