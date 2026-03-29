@@ -8,8 +8,6 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { toast } from "sonner";
-import { db } from "@/lib/firebase";
-import { collection, query, where, orderBy, limit, getDocs } from "firebase/firestore";
 
 /**
  * VideoStatus represents the state of the video generation pipeline.
@@ -31,7 +29,6 @@ const VideoReport = ({ data: localFallbackData }: VideoReportProps) => {
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [generatedScript, setGeneratedScript] = useState<string>("");
   const [progress, setProgress] = useState(0);
-  const [isUsingEnterpriseCache, setIsUsingEnterpriseCache] = useState(false);
 
   // Get environment variables
   const TAVUS_API_KEY = process.env.NEXT_PUBLIC_TAVUS_API_KEY;
@@ -40,30 +37,23 @@ const VideoReport = ({ data: localFallbackData }: VideoReportProps) => {
 
   /**
    * STEP 1: Signal Retrieval Layer
-   * Fetches the latest 'Video-Worthy' signal from the enterprise cache (market_signals).
+   * Fetches the latest 'Video-Worthy' signal from the enterprise cache via backend proxy.
    */
   const getLatestVideoWorthySignal = async () => {
     setVideoStatus("fetching_signal");
     setProgress(10);
     
     try {
-      const signalsRef = collection(db, "market_signals");
-      const q = query(
-        signalsRef, 
-        orderBy("timestamp", "desc"), 
-        limit(1)
-      );
-      
-      const querySnapshot = await getDocs(q);
-      
-      if (!querySnapshot.empty) {
-        const signalDoc = querySnapshot.docs[0].data();
-        setIsUsingEnterpriseCache(true);
-        return signalDoc.outputs || signalDoc;
+      const response = await fetch("http://localhost:5500/api/live-news");
+      if (response.ok) {
+        const signals = await response.json();
+        if (signals && signals.length > 0) {
+           return signals[0]; // Take the freshest news item
+        }
       }
       return null;
     } catch (err) {
-      console.error("Firestore Signal Retrieval Failed:", err);
+      console.error("Backend Signal Retrieval Failed:", err);
       return null;
     }
   };
@@ -84,8 +74,8 @@ const VideoReport = ({ data: localFallbackData }: VideoReportProps) => {
     const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
 
     // Technical grounding of source data
-    const reasoning = marketData.reasoning || marketData.whyItMatters || marketData.outputs?.recommendation?.balancedView || "Deep technical analysis pending.";
-    const whatHappened = marketData.whatHappened || marketData.headline || marketData.symbol || "High-Impact Market Event.";
+    const reasoning = marketData.reasoning || marketData.whyItMatters || marketData.aiAnalysis?.reasoning || "Deep technical analysis pending.";
+    const whatHappened = marketData.whatHappened || marketData.headline || marketData.title || marketData.symbol || "High-Impact Market Event.";
 
     const prompt = `
       You are a Senior Financial Analyst at ET Edge. 
@@ -112,7 +102,6 @@ const VideoReport = ({ data: localFallbackData }: VideoReportProps) => {
       setGeneratedScript(scriptText);
       return scriptText;
     } catch (err: any) {
-      // Slient fallback handled in caller
       throw err;
     }
   };
@@ -157,13 +146,13 @@ const VideoReport = ({ data: localFallbackData }: VideoReportProps) => {
       
       if (!signalData) {
         if (localFallbackData) {
-          toast.info("No enterprise signal found. Using local context.");
+          toast.info("No fresh backend signal found. Using local context.");
           signalData = localFallbackData;
         } else {
           throw new Error("No video-worthy market signals found.");
         }
       } else {
-        toast.success("Enterprise-grade signal detected. Initiating broadcast pipeline.");
+        toast.success("Intelligence signal detected. Initiating broadcast pipeline.");
       }
 
       // 2. AUTONOMOUS SCRIPTING
@@ -188,7 +177,7 @@ const VideoReport = ({ data: localFallbackData }: VideoReportProps) => {
 
   const getStatusText = () => {
     switch (videoStatus) {
-      case "fetching_signal": return "📡 Querying Enterprise Cache...";
+      case "fetching_signal": return "📡 Querying Intelligence Hub...";
       case "generating_script": return "🧠 Drafting 30s Market Briefing...";
       case "synthesizing_video": return "🎥 Dispatching to Tavus Digital Twin...";
       case "ready": return "Video Ready for Broadcast";
@@ -269,12 +258,6 @@ const VideoReport = ({ data: localFallbackData }: VideoReportProps) => {
                       style={{ width: `${progress}%` }} 
                     />
                   </Progress>
-                  <div className="grid grid-cols-4 gap-2">
-                    <div className={`h-1.5 rounded-full transition-colors duration-300 ${progress >= 25 ? "bg-accent" : "bg-border/20"}`} />
-                    <div className={`h-1.5 rounded-full transition-colors duration-300 ${progress >= 50 ? "bg-accent" : "bg-border/20"}`} />
-                    <div className={`h-1.5 rounded-full transition-colors duration-300 ${progress >= 75 ? "bg-accent" : "bg-border/20"}`} />
-                    <div className={`h-1.5 rounded-full transition-colors duration-300 ${progress >= 100 ? "bg-accent" : "bg-border/20"}`} />
-                  </div>
                 </div>
               )}
 
@@ -333,5 +316,3 @@ const VideoReport = ({ data: localFallbackData }: VideoReportProps) => {
 };
 
 export default VideoReport;
-
-

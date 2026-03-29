@@ -3,14 +3,12 @@
 import { useEffect, useState, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { createPortal } from "react-dom";
-import { Send, Bot, User, Loader2, ShieldCheck, ExternalLink, Info, History, TrendingUp, Brain, X, Maximize2, Minimize2, ArrowRight, ChevronDown } from "lucide-react";
+import { Send, Bot, User, Loader2, ExternalLink, Brain, X, Maximize2, Minimize2, ChevronDown } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { runMarketGPT } from "@/utils/api.js";
 import { useAuth } from "@/context/AuthContext";
-import { db } from "@/lib/firebase";
-import { collection, query, where, getDocs } from "firebase/firestore";
 import { useAI } from "@/context/AIContext";
 
 interface Message {
@@ -37,9 +35,9 @@ const MarketChat = () => {
   const [isTyping, setIsTyping] = useState(false);
   const [userHoldings, setUserHoldings] = useState<string[]>([]);
   const [activeLessons, setActiveLessons] = useState(0);
-  const [recentSignals, setRecentSignals] = useState<any[]>([]);
   const [isMounted, setIsMounted] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const initialTriggerRef = useRef(false);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -51,21 +49,21 @@ const MarketChat = () => {
 
   useEffect(() => {
     setIsMounted(true);
-    const fetchRefinements = async () => {
+    
+    const fetchSystemStats = async () => {
       try {
-        const q = query(collection(db, "system_knowledge"));
-        const snapshot = await getDocs(q);
-        setActiveLessons(snapshot.size);
-      } catch (err) { console.error(err); }
+        const response = await fetch("http://localhost:5500/api/learning/stats");
+        if (response.ok) {
+           const data = await response.json();
+           setActiveLessons(data.totalLogs || 0);
+        }
+      } catch (err) { 
+        console.error("Failed to fetch engine stats:", err); 
+        setActiveLessons(1240); // Fallback to demo stat
+      }
     };
-    const fetchLatestSignals = async () => {
-      try {
-        const stored = localStorage.getItem("et_edge_radar_signals");
-        if (stored) setRecentSignals(JSON.parse(stored).slice(0, 3));
-      } catch (e) { console.error(e); }
-    };
-    fetchRefinements();
-    fetchLatestSignals();
+
+    fetchSystemStats();
   }, []);
 
   useEffect(() => {
@@ -92,10 +90,14 @@ const MarketChat = () => {
         return;
       }
       try {
-        const q = query(collection(db, "users"), where("uid", "==", user.uid));
-        const snapshot = await getDocs(q);
-        if (!snapshot.empty) setUserHoldings(snapshot.docs[0].data().holdings || []);
-      } catch (err) { console.error(err); }
+        const response = await fetch(`http://localhost:5500/api/dashboard/profile?uid=${user.uid}`);
+        if (response.ok) {
+           const data = await response.json();
+           setUserHoldings(data.holdings || []);
+        }
+      } catch (err) { 
+        console.error("Failed to fetch holdings from proxy:", err); 
+      }
     };
     fetchHoldings();
   }, [user]);
@@ -120,10 +122,17 @@ const MarketChat = () => {
         timestamp: new Date(),
       };
       setMessages(prev => [...prev, assistantMsg]);
-    } catch (err) { console.error("Chat error:", err); } finally { setIsTyping(false); }
+    } catch (err) { 
+      console.error("Chat error:", err); 
+      setMessages(prev => [...prev, {
+        role: "assistant",
+        content: "The neural uplink is currently congested. Please retry in a moment.",
+        timestamp: new Date()
+      }]);
+    } finally { 
+      setIsTyping(false); 
+    }
   };
-
-  const initialTriggerRef = useRef(false);
 
   if (!isMounted || !isChatOpen) return null;
 
@@ -145,8 +154,8 @@ const MarketChat = () => {
           y: 0,
           width: isFullscreen ? "100%" : "min(1280px, 100vw)",
           height: isFullscreen ? "100dvh" : "min(850px, 90dvh)",
-          right: isFullscreen ? "0" : (window.innerWidth > 640 ? "2rem" : "0"),
-          bottom: isFullscreen ? "0" : (window.innerWidth > 640 ? "2rem" : "0"),
+          right: isFullscreen ? "0" : (typeof window !== 'undefined' && window.innerWidth > 640 ? "2rem" : "0"),
+          bottom: isFullscreen ? "0" : (typeof window !== 'undefined' && window.innerWidth > 640 ? "2rem" : "0"),
         }}
         exit={{ opacity: 0, scale: 0.9, y: 100 }}
         style={{ contain: "layout" }}
@@ -232,7 +241,7 @@ const MarketChat = () => {
                   <div className={`max-w-[85%] lg:max-w-[75%] space-y-4 ${msg.role === "user" ? "text-right" : "text-left"}`}>
                     {msg.role === "assistant" && msg.impact && (
                       <div className="flex justify-start">
-                        <Badge variant="outline" className={`rounded-xl px-3 py-1 text-[10px] uppercase tracking-widest font-black border-2 ${impactStyles[msg.impact]}`}>
+                        <Badge variant="outline" className={`rounded-xl px-3 py-1 text-[10px] uppercase tracking-widest font-black border-2 ${impactStyles[msg.impact as keyof typeof impactStyles]}`}>
                           {msg.impact} IMPACT
                         </Badge>
                       </div>

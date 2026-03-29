@@ -70,8 +70,8 @@ async function saveToFirestore(collection, data) {
 }
 
 /**
- * Requirement 1: fetchMarketNews with Emergency Fallback.
- * If NewsData (401) or any API fails, it returns the high-fidelity emergency_seed.
+ * fetchMarketNews with Zero-Failure Caching.
+ * Maintains global.lastSuccessfulNews to handle EAI_AGAIN or 401 errors without UI degradation.
  */
 async function fetchMarketNews() {
     const apiKey = process.env.NEWSDATA_API_KEY;
@@ -81,33 +81,37 @@ async function fetchMarketNews() {
         console.log('📡 Fetching Market News...');
         const res = await fetch(url);
         
-        // Handle 401 or failed responses gracefully
         if (res.status === 401 || !res.ok) {
-            console.warn(`⚠️ News API Failed (${res.status}). Switching to Emergency Seed.`);
-            return emergency_seed;
+            console.warn(`⚠️ News API Unavailable (${res.status}).`);
+            return global.lastSuccessfulNews || emergency_seed;
         }
 
         const data = await res.json();
         if (data.status !== "success") {
-            console.warn("⚠️ Provider Error. Switching to Emergency Seed.");
-            return emergency_seed;
+            console.warn("⚠️ Provider Status Error.");
+            return global.lastSuccessfulNews || emergency_seed;
         }
 
-        const results = data.results || [];
-        return results.slice(0, 5).map(r => ({
+        const decoded = (data.results || []).slice(0, 10).map(r => ({
             title: r.title,
             description: r.description || r.content || "Deep analysis available in intelligence loop.",
             aiAnalysis: {
                 sentiment: "Neutral",
-                impactScore: 50,
-                reasoning: "Analysis pending for this specific headline.",
+                sector: "Market",
+                reasoning: "Analysis trace pending for live feed.",
                 source: "[Source: Institutional Feed]"
             }
         }));
 
+        if (decoded.length > 0) {
+            global.lastSuccessfulNews = decoded; // Cache high-fidelity live data
+        }
+
+        return decoded.length > 0 ? decoded : (global.lastSuccessfulNews || emergency_seed);
+
     } catch (err) {
-        console.error('❌ Network Failure in fetchMarketNews:', err.message);
-        return emergency_seed; // Ensure UI never looks empty
+        console.error('❌ Network Connection Error (EAI_AGAIN?):', err.message);
+        return global.lastSuccessfulNews || emergency_seed;
     }
 }
 
@@ -120,6 +124,38 @@ const PORT = process.env.PORT || 5500;
 
 app.use(corsMiddleware);
 app.use(express.json());
+
+// 🚀 Market Summary Proxy (Zero-Failure)
+app.get('/api/market-summary', async (req, res) => {
+    try {
+        console.log('📡 Fetching Market Summary...');
+        const { fetchNifty50, fetchTopMovers } = require('./services/yahooFinance');
+        
+        const [nifty, movers] = await Promise.all([
+            fetchNifty50(),
+            fetchTopMovers()
+        ]);
+
+        const summary = {
+            nifty50: {
+                price: nifty.price || 0,
+                change: nifty.change || 0,
+                changePct: nifty.changePct || 0,
+                chartData: nifty.chartData || [],
+                lastUpdated: new Date().toISOString()
+            },
+            topGainer: movers.topGainer || { ticker: 'N/A', changePct: 0 },
+            topLoser: movers.topLoser || { ticker: 'N/A', changePct: 0 },
+            timestamp: new Date().toISOString()
+        };
+
+        global.lastMarketSummary = summary; // Persistence Catch
+        res.status(200).json(summary);
+    } catch (err) {
+        console.error('❌ Market Summary Failure:', err.message);
+        res.status(200).json(global.lastMarketSummary || { error: "Service degraded" });
+    }
+});
 
 // Routes
 app.use('/api/live-news', require('./routes/news'));

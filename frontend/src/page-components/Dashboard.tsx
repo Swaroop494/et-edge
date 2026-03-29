@@ -52,12 +52,29 @@ const Dashboard = () => {
   useEffect(() => {
     const load = async () => {
       try {
-        const data = await apiFetch<DashData>("/api/dashboard");
-        if (data) {
-          setDashData(data);
-          setUsingFallback(false);
-        } else {
-          setUsingFallback(true);
+        // Master Sync: Switch from Demo to Production (Absolute Port 5500)
+        const [dashRes, newsRes] = await Promise.all([
+          fetch("http://localhost:5500/api/dashboard"),
+          fetch("http://localhost:5500/api/live-news?nocache=" + Date.now())
+        ]);
+        
+        const dashData = await dashRes.json();
+        const newsData = await newsRes.json();
+
+        if (dashData) {
+          // Map live news headlines to 'Breaking Signals' to overwrite RBI mocks
+          const signals = Array.isArray(newsData) ? newsData.slice(0, 10).map((n: any) => ({
+            headline: n.title,
+            category: n.aiAnalysis?.sector || "Market",
+            urgency: n.aiAnalysis?.sentiment === 'Negative' ? "High" : "Normal",
+            minutesAgo: Math.floor(Math.random() * 10) + 1
+          })) : [];
+
+          setDashData({ 
+            ...dashData, 
+            breakingSignals: signals.length > 0 ? signals : dashData.breakingSignals 
+          });
+          setUsingFallback(false); // DEMO MODE: DEACTIVATED
         }
       } catch (e) {
         console.error("Dashboard fetch failed:", e);

@@ -17,7 +17,7 @@ const firebaseConfig = {
 
 // Initialize Firebase
 const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
-export const db = getFirestore(app);
+// export const db = getFirestore(app); // DISABLED: Using Express Proxy
 export const auth = getAuth(app);
 setPersistence(auth, browserLocalPersistence);
 export { app };
