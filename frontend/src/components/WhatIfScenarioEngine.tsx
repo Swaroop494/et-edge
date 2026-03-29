@@ -1,226 +1,81 @@
 "use client";
 
-import { useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
-import { z } from "zod";
-import { ArrowDownRight, ArrowUpRight, Loader2, Minus, SendHorizonal } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Progress } from "@/components/ui/progress";
-import { runWhatIfScenario } from "@/utils/api.js";
-
-const scenarioSchema = z.string().trim().min(8, "Ask a slightly fuller what-if question.").max(160, "Keep the scenario concise.");
-
-const directionIcon = {
-  Up: ArrowUpRight,
-  Down: ArrowDownRight,
-  Mixed: Minus,
-};
-
-interface AIResult {
-  label: string;
-  narrative: string;
-  risk: number;
-  sectors: { name: string; direction: "Up" | "Down" | "Mixed" }[];
-}
-
-const defaultResult: AIResult = {
-  label: "Awaiting Scenario",
-  narrative: "Input a market hypothetical to generate an AI-driven impact analysis.",
-  risk: 0,
-  sectors: [
-    { name: "Banking", direction: "Mixed" },
-    { name: "IT Services", direction: "Mixed" },
-    { name: "Auto", direction: "Mixed" },
-  ],
-};
+import React, { useState } from "react";
+import { apiFetch } from "@/lib/api";
 
 const WhatIfScenarioEngine = () => {
-  const [query, setQuery] = useState("What if interest rates increase further?");
-  const [error, setError] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
-  const [aiResult, setAiResult] = useState<AIResult>(defaultResult);
-  const [submittedQuery, setSubmittedQuery] = useState("");
-  const [engineSource, setEngineSource] = useState<"Groq" | "Gemini" | "Demo">("Groq");
+  const [scenario, setScenario] = useState("");
+  const [result, setResult] = useState<any>(null);
+  const [loading, setLoading] = useState(false);
 
-  const handleSubmit = async () => {
-    const parsed = scenarioSchema.safeParse(query);
-
-    if (!parsed.success) {
-      setError(parsed.error.issues[0]?.message ?? "Please refine the scenario.");
-      return;
-    }
-
-    setError("");
-    setIsLoading(true);
-    setSubmittedQuery(parsed.data);
-
-    const fallbackResult: AIResult = {
-      label: "Gold Surge Anticipated",
-      narrative: "Due to ongoing geopolitical uncertainties and shifting bond yields, we've switched to diagnostic mode. Gold remains a primary safe-haven asset, drawing capital from equity segments.",
-      risk: 45,
-      sectors: [
-        { name: "Precious Metals", direction: "Up" },
-        { name: "Banking", direction: "Down" },
-        { name: "Real Estate", direction: "Down" },
-      ]
-    };
-
+  const handleRunScenario = async () => {
+    if (!scenario) return;
+    setLoading(true);
     try {
-      // Verified backend what-if engine (no browser-side LLM)
-      const result = await runWhatIfScenario(parsed.data);
-      const scenarioText = result?.scenarioResult?.actualOutcome
-        ? String(result.scenarioResult.actualOutcome)
-        : "Scenario analysis completed using verified historical data.";
-
-      setAiResult({
-        label: result?.scenarioResult?.verdict
-          ? `Scenario: ${String(result.scenarioResult.verdict)}`
-          : "Scenario Result",
-        narrative: scenarioText,
-        risk: 50,
-        sectors: [
-          { name: "Equities", direction: "Mixed" },
-          { name: "Risk", direction: "Mixed" },
-          { name: "Momentum", direction: "Mixed" },
-        ],
+      const data = await apiFetch<any>("/api/what-if", {
+        method: "POST",
+        body: JSON.stringify({ scenarioText: scenario }),
       });
-      setEngineSource("Gemini");
+      setResult(data);
     } catch (err) {
-      console.warn("Scenario backend unavailable, demo fallback:", err);
-      setAiResult(fallbackResult);
-      setEngineSource("Demo");
+      console.error("Scenario failed", err);
     } finally {
-      setIsLoading(false);
+      setLoading(false);
     }
   };
 
-  const displayResult = aiResult ?? defaultResult;
-
   return (
-    <section className="relative min-h-screen overflow-hidden px-6 py-24 md:px-10 lg:px-16">
-      <div className="absolute inset-0 gradient-scenario" />
-      <div className="absolute inset-0 vignette-soft pointer-events-none" />
-      <div className="absolute inset-0 pointer-events-none">
-        <div className="absolute inset-0 bg-gradient-to-b from-background/10 via-background/30 to-background" />
-        <motion.div
-          className="absolute left-[20%] top-[25%] h-[26rem] w-[26rem] rounded-full bg-teal/10 blur-[150px]"
-          animate={{ x: [0, 18, 0], y: [0, -15, 0] }}
-          transition={{ duration: 17, repeat: Infinity, ease: "easeInOut" }}
-        />
-        <motion.div
-          className="absolute bottom-[8%] right-[10%] h-[24rem] w-[24rem] rounded-full bg-accent/8 blur-[150px]"
-          animate={{ x: [0, -20, 0], y: [0, -24, 0] }}
-          transition={{ duration: 15, repeat: Infinity, ease: "easeInOut" }}
-        />
-        <motion.div
-          className="absolute right-[40%] top-[50%] h-[18rem] w-[18rem] rounded-full bg-electric-violet/6 blur-[120px]"
-          animate={{ scale: [1, 1.1, 1], opacity: [0.3, 0.5, 0.3] }}
-          transition={{ duration: 13, repeat: Infinity, ease: "easeInOut" }}
-        />
-      </div>
+    <div className="p-8 max-w-5xl mx-auto">
+      <div className="bg-white/5 border border-white/10 rounded-3xl p-8">
+        <h1 className="text-3xl font-bold text-white mb-2">Scenario Engine</h1>
+        <p className="text-gray-400 mb-8 text-sm">Predict market shifts before they manifest.</p>
 
-      <div className="relative z-10 mx-auto flex min-h-[calc(100vh-12rem)] max-w-7xl flex-col justify-center gap-8">
-        <div className="max-w-4xl">
-          <Badge variant="outline" className="border-border/40 bg-secondary/40 px-4 py-1 text-[0.65rem] uppercase tracking-[0.32em] text-text-secondary">
-            What-if Scenario Engine
-          </Badge>
-          <h2 className="mt-6 font-display text-4xl leading-[0.94] text-foreground md:text-6xl">Explore the next move before the market forces it on you.</h2>
-          <p className="mt-5 max-w-3xl text-base leading-8 text-text-secondary md:text-lg">
-            Ask a scenario in plain English and get an immediate read on affected sectors, expected direction, and relative risk.
-          </p>
-        </div>
-
-        <div className="glass-strong rounded-[2rem] p-6 md:p-8 relative overflow-hidden">
-          {isLoading && (
-            <div className="absolute inset-0 z-20 flex items-center justify-center bg-background/40 backdrop-blur-sm animate-pulse">
-              <div className="flex items-center gap-3 text-primary font-medium">
-                <Loader2 className="animate-spin" size={20} />
-                <span>Analysing with AI...</span>
-              </div>
-            </div>
-          )}
-          <div className="flex flex-col gap-4 lg:flex-row">
-            <Input
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              onKeyDown={(event) => event.key === "Enter" && handleSubmit()}
-              placeholder="What if interest rates increase?"
-              className="h-12 rounded-2xl border-border/30 bg-secondary/30 text-foreground placeholder:text-text-secondary/60 focus-visible:ring-primary/40"
-              disabled={isLoading}
-            />
-            <Button onClick={handleSubmit} className="h-12 rounded-2xl px-6" disabled={isLoading}>
-              {isLoading ? <Loader2 className="animate-spin mr-2" size={16} /> : <SendHorizonal size={16} />}
-              Run scenario
-            </Button>
-          </div>
-          {error ? <p className="mt-3 text-sm text-critical">{error}</p> : null}
-        </div>
-
-        <AnimatePresence mode="wait">
-          <motion.div
-            key={submittedQuery || "initial"}
-            initial={{ opacity: 0, y: 22, filter: "blur(12px)" }}
-            animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
-            exit={{ opacity: 0, y: -16, filter: "blur(10px)" }}
-            transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
-            className="grid gap-6 lg:grid-cols-[0.82fr_1.18fr]"
+        <div className="relative mb-12">
+          <input
+            value={scenario}
+            onChange={(e) => setScenario(e.target.value)}
+            placeholder="What if crude oil prices spike to $120?"
+            className="w-full bg-black/40 border border-white/10 rounded-2xl p-5 text-white pr-32 focus:border-purple-500 outline-none transition-all"
+          />
+          <button
+            onClick={handleRunScenario}
+            disabled={loading}
+            className="absolute right-2 top-2 bottom-2 px-6 bg-purple-600 hover:bg-purple-500 text-white rounded-xl text-sm font-bold transition-all disabled:opacity-50"
           >
-            <div className="glass rounded-[2rem] p-8 relative">
-              <p className="text-xs uppercase tracking-[0.28em] text-text-secondary">Scenario read</p>
-              <h3 className="mt-4 font-display text-3xl text-foreground">{displayResult.label}</h3>
-              <p className="mt-4 text-sm leading-7 text-text-secondary">{displayResult.narrative}</p>
+            {loading ? "Calculating..." : "Run Scenario"}
+          </button>
+        </div>
 
-              <div className="mt-8 pb-10">
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-text-secondary">Risk level</span>
-                  <span className="text-foreground">{displayResult.risk}%</span>
-                </div>
-                <Progress value={displayResult.risk} className="mt-3 h-3 bg-secondary/70" />
-              </div>
-
-              {/* Attribution Text */}
-              <div className="absolute bottom-6 left-8 flex items-center gap-2">
-                <div className={`h-1.5 w-1.5 rounded-full ${engineSource === 'Demo' ? 'bg-orange-500' : 'bg-emerald-500'}`} />
-                <span className="text-[10px] font-semibold uppercase tracking-widest text-text-secondary/60">
-                  {engineSource === 'Demo' ? 'Demo Mode' : `Powered by ${engineSource}`}
-                </span>
+        {/* RESULTS GAUGE */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {['Equities', 'Risk', 'Momentum'].map((sector) => (
+            <div key={sector} className="bg-white/5 p-6 rounded-2xl border border-white/5 text-center">
+              <span className="text-[10px] uppercase text-gray-500 tracking-tighter">{sector}</span>
+              {/* FIX: Dynamic color and text based on AI Verdict */}
+              <div className={cn(
+                "text-xl font-bold mt-2",
+                result?.impactDirection === 'positive' ? 'text-green-400' : 
+                result?.impactDirection === 'negative' ? 'text-red-400' : 'text-purple-400'
+              )}>
+                {result ? (result.impactDirection === 'positive' ? 'Bullish' : 'Bearish') : 'Mixed'}
               </div>
             </div>
-
-            <div className="glass rounded-[2rem] p-8">
-              <p className="text-xs uppercase tracking-[0.28em] text-text-secondary">Affected sectors</p>
-              <div className="mt-6 grid gap-4 md:grid-cols-3">
-                {displayResult.sectors.map((sector, index) => {
-                  const Icon = directionIcon[sector.direction] || Minus;
-                  return (
-                    <motion.div
-                      key={`${sector.name}-${index}`}
-                      initial={{ opacity: 0, y: 16, filter: "blur(8px)" }}
-                      animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
-                      transition={{ duration: 0.55, delay: index * 0.08, ease: [0.16, 1, 0.3, 1] }}
-                      className="rounded-[1.5rem] border border-border/30 bg-secondary/20 p-5"
-                    >
-                      <div className="flex items-center justify-between gap-3">
-                        <Badge variant="outline" className="rounded-full border-accent/20 bg-accent/10 px-3 py-1 text-xs text-foreground">
-                          {sector.name}
-                        </Badge>
-                        <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary/10 text-primary">
-                          <Icon size={16} />
-                        </div>
-                      </div>
-                      <p className="mt-6 font-display text-2xl text-foreground">{sector.direction}</p>
-                    </motion.div>
-                  );
-                })}
-              </div>
-            </div>
-          </motion.div>
-        </AnimatePresence>
+          ))}
+        </div>
+        
+        {result && (
+          <div className="mt-8 p-6 bg-purple-500/5 border border-purple-500/20 rounded-2xl">
+            <h4 className="text-purple-400 text-xs font-bold mb-2 uppercase">Neural Result</h4>
+            <p className="text-gray-300 text-sm leading-relaxed">
+              {result.scenarioResult?.actualOutcome || result.scenarioResult?.reasoning}
+            </p>
+          </div>
+        )}
       </div>
-    </section>
+    </div>
   );
 };
+
+function cn(...classes: any[]) { return classes.filter(Boolean).join(' '); }
 
 export default WhatIfScenarioEngine;

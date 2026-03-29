@@ -231,9 +231,9 @@ const FinfluencerDetector = ({ eventId }: FinfluencerDetectorProps) => {
               </motion.div>
 
               <div className="mt-8 space-y-4">
-                {validationResult?.reason ? (
+                {validationResult?.reasoning ? (
                   <div className="rounded-[1.5rem] border border-border/30 bg-secondary/20 p-5 text-sm leading-7 text-foreground">
-                    {validationResult.reason}
+                    {validationResult.reasoning}
                   </div>
                 ) : (
                    !isLoading && <p className="text-text-secondary italic text-sm text-center">Enter a tip and click reveal to begin detection.</p>

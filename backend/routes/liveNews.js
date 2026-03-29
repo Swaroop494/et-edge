@@ -15,8 +15,6 @@ router.get('/', async (req, res) => {
         const fifteenMinsAgo = new Date(Date.now() - 15 * 60 * 1000);
         const cachedAnalysis = await db.collection('intelligence')
             .where('type', '==', 'batch_news')
-            .where('timestamp', '>', fifteenMinsAgo)
-            .orderBy('timestamp', 'desc')
             .limit(1)
             .get();
 

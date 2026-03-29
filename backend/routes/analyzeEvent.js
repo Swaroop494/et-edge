@@ -28,7 +28,9 @@ router.post('/', async (req, res) => {
         - confidenceScore: number (0-100)
         - affectedSectors: array of strings
         - affectedStocks: array of strings
-        - impactDirection: "positive", "negative", or "mixed"`;
+        - impactDirection: "Positive", "Negative", or "Volatile"
+        
+        Tweak: Determine if the impact is 'Positive', 'Negative', or 'Volatile'. Do not default to 'Mixed' unless strictly necessary.`;
 
         const result = await callAI(systemPrompt, userPrompt);
         
@@ -55,7 +57,7 @@ router.post('/', async (req, res) => {
             confidenceScore: 65,
             affectedSectors: ["Banking", "Energy"],
             affectedStocks: ["NIFTY"],
-            impactDirection: "mixed"
+            impactDirection: "Volatile"
         });
     }
 });

@@ -100,3 +100,27 @@ export async function fetchLearningStats(): Promise<LearningStats> {
     };
   }
 }
+
+export async function runScenario(text: string) {
+  try {
+    const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5500'}/api/what-if`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ scenarioText: text })
+    });
+    
+    const data = await response.json();
+    
+    // MAP BACKEND KEYS TO FRONTEND STATE
+    return {
+      result: data.scenarioResult.actualOutcome || data.scenarioResult.reasoning,
+      verdict: data.scenarioResult.verdict,
+      risk: data.riskLevel,
+      sectors: data.impactSectors
+    };
+  } catch (error) {
+    console.error("Scenario API failed");
+    return null;
+  }
+}
+

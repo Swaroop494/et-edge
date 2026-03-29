@@ -52,7 +52,6 @@ async function fetchLatestIndianNews() {
         try {
             const memorySnapshot = await db.collection('intelligence')
                 .where('type', '==', 'batch_news')
-                .orderBy('timestamp', 'desc')
                 .limit(1)
                 .get();
                 

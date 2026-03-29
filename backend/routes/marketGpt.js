@@ -18,7 +18,6 @@ router.post('/', async (req, res) => {
     
     const cached = await db.collection('market_analysis')
       .where('queryHash', '==', queryHash)
-      .where('timestamp', '>', sixHoursAgo)
       .limit(1)
       .get();
     
@@ -42,7 +41,7 @@ router.post('/', async (req, res) => {
     const systemPrompt = "You are a Senior Fiduciary Analyst. Return ONLY valid JSON with answer, impact (High/Medium/Low), citations (array), and reasoningTrace (array).";
     
     const response = await axios.post("https://openrouter.ai/api/v1/chat/completions", {
-      model: "meta-llama/llama-3-8b-instruct:free", // Resilient fallback for demo stability
+      model: "openai/gpt-4o-mini", // OpenRouter standard provider/model format
       messages: [
         { role: "system", content: systemPrompt },
         { role: "user", content: `Analyze: ${query}. User context: ${JSON.stringify(userHoldings)}` }

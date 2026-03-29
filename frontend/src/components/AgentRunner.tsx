@@ -111,15 +111,41 @@ const AgentRunner = () => {
         {result && (
           <motion.div initial={{ opacity: 0, y: 16, filter: "blur(8px)" }} animate={{ opacity: 1, y: 0, filter: "blur(0px)" }} exit={{ opacity: 0 }} transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }} className="space-y-4">
             <p className="text-xs uppercase tracking-[0.28em] text-text-secondary">Agent summary</p>
-            {result.outputs?.eventAnalysis?.actionableAlert && (
-              <div className="rounded-[1.5rem] border border-accent/30 bg-accent/5 p-5">
-                <p className="text-xs uppercase tracking-[0.24em] text-accent mb-2">Actionable Alert</p>
-                <p className="text-sm leading-7 text-foreground">{result.outputs.eventAnalysis.actionableAlert}</p>
-              </div>)
-            }
-            <div className="rounded-[1.5rem] border border-border/30 bg-secondary/20 p-5">
-              <p className="text-sm leading-7 text-foreground">{result.outputs?.agentSummary}</p>
-            </div>
+            {(() => {
+              const parseAIString = (val: any) => {
+                if (typeof val !== 'string') return val;
+                try {
+                  const parsed = JSON.parse(val.replace(/```json|```/g, '').trim());
+                  return parsed.findings || parsed.summary || parsed.result || (typeof parsed === 'string' ? parsed : JSON.stringify(parsed));
+                } catch (e) {
+                  return val;
+                }
+              };
+
+              const alertText = result.outputs?.eventAnalysis?.actionableAlert;
+              const summaryText = result.outputs?.agentSummary;
+
+              const cleanAlert = parseAIString(alertText);
+              const cleanSummary = parseAIString(summaryText);
+
+              return (
+                <div className="space-y-4">
+                  {cleanAlert && (
+                    <div className="rounded-[1.5rem] border border-accent/30 bg-accent/5 p-5">
+                      <p className="text-xs uppercase tracking-[0.24em] text-accent mb-2">Actionable Alert</p>
+                      <p className="text-sm leading-7 text-foreground">
+                        {typeof cleanAlert === 'object' ? (cleanAlert.findings || cleanAlert.summary || JSON.stringify(cleanAlert)) : cleanAlert}
+                      </p>
+                    </div>
+                  )}
+                  <div className="rounded-[1.5rem] border border-border/30 bg-secondary/20 p-5">
+                    <p className="text-sm leading-7 text-foreground">
+                      {typeof cleanSummary === 'object' ? (cleanSummary.findings || cleanSummary.summary || JSON.stringify(cleanSummary)) : cleanSummary}
+                    </p>
+                  </div>
+                </div>
+              );
+            })()}
             <div className="grid gap-3 md:grid-cols-3">
               <div className="rounded-[1.5rem] border border-border/30 bg-secondary/20 p-4 text-center">
                 <p className="text-xs uppercase tracking-[0.24em] text-text-secondary">Steps completed</p>
