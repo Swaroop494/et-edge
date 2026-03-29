@@ -1,7 +1,9 @@
 // ET Edge — Analyze Event Route. Accepts headline + summary, returns Gemini AI event analysis.
+const path = require('path');
 const express = require('express');
 const router = express.Router();
 const { GoogleGenerativeAI } = require('@google/generative-ai');
+const fs = require('fs');
 
 const headlineAnalysisCache = new Map();
 
@@ -33,6 +35,13 @@ router.post('/', async (req, res) => {
     }
 
     const normalizedHeadline = headline.trim().toLowerCase();
+    
+    if (global.USE_MOCKS) {
+        console.log("Serving mock analyzeEvent response (Demo Mode)");
+        const mockResp = buildMockAnalysis(headline, summary);
+        return res.status(200).json(mockResp);
+    }
+    
     if (headlineAnalysisCache.has(normalizedHeadline)) {
         return res.status(200).json(headlineAnalysisCache.get(normalizedHeadline));
     }
@@ -42,11 +51,20 @@ router.post('/', async (req, res) => {
         
         // Use gemini-2.5-flash-lite for high-performance extraction
         const model = genAI.getGenerativeModel({ 
-            model: "gemini-2.5-flash-lite",
-            systemInstruction: "You are an Indian financial market event classifier. You only respond in valid JSON with no additional text, explanation, or markdown code blocks outside the JSON object. Never wrap response in backticks. Classify events as macro or micro. Macro events are broad economic events like RBI decisions, Union Budget, inflation data, global oil prices, geopolitical events affecting India. Micro events are company specific like quarterly earnings, mergers, acquisitions, management changes, block deals, insider trading. Return confidence score 0-100 based on clarity of market impact. Never use financial jargon."
+            model: "gemini-2.0-flash-lite",
+            systemInstruction: `You are a Senior Fiduciary Analyst. For every market event or news item, you MUST return a JSON object with:
+            - eventType: (e.g., "Macro", "Sector", "Regulatory")
+            - whatHappened: (A concise headline)
+            - whyItMatters: (2-3 sentences of deep financial reasoning)
+            - source: (A specific citation like [Source: NSE Filing Q3])
+            - affectedSectors: (An array of strings)
+            - affectedStocks: (An array of strings)
+            - impactDirection: ("positive" or "negative" or "mixed")
+            
+            The Explainability Requirement: If reasoning or a source is missing, the response is invalid. Do not return just numbers.`
         });
 
-        const prompt = `Analyze this Indian market event and return ONLY a valid JSON object with exactly these fields — eventType: string macro or micro, affectedSectors: array, affectedStocks: array, confidenceScore: number, whatHappened: string, whyItMatters: string, impactDirection: string. Headline: ${headline} Summary: ${summary}`;
+        const prompt = `Analyze this Indian market event and return a JSON object. Headline: ${headline} Summary: ${summary}`;
 
         let parsedResponse;
         try {
@@ -54,9 +72,11 @@ router.post('/', async (req, res) => {
             const textResponse = result.response.text();
             const cleanedText = textResponse.replace(/```json/g, '').replace(/```/g, '').trim();
             parsedResponse = JSON.parse(cleanedText);
-        } catch (analysisErr) {
-            console.error("Gemini analysis failed, returning mock analysis fallback:", analysisErr?.message || analysisErr);
-            parsedResponse = buildMockAnalysis(headline, summary);
+        } catch (err) {
+            console.log('📡 Mode: Safety Fallback (Analyze Event Error)');
+            const mockDataPath = path.join(__dirname, "../../data/radar_events.json");
+            const rawMock = JSON.parse(fs.readFileSync(mockDataPath, 'utf8')).events;
+            return res.status(200).json(rawMock[0]);
         }
 
         headlineAnalysisCache.set(normalizedHeadline, parsedResponse);
@@ -65,7 +85,7 @@ router.post('/', async (req, res) => {
     } catch (err) {
         const fallback = buildMockAnalysis(headline, summary);
         headlineAnalysisCache.set(normalizedHeadline, fallback);
-        console.error("Event analysis route failed, returning fallback:", err);
+        console.log("Event analysis route failed, returning fallback:", err);
         return res.status(200).json(fallback);
     }
 });

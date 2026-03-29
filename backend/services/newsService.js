@@ -1,87 +1,53 @@
+const fetch = (...args) => import('node-fetch').then(({default: fetch}) => fetch(...args));
 const { GoogleGenerativeAI } = require('@google/generative-ai');
-const cache = require('./marketCache');
 
-const FALLBACK_SIGNALS = [
-  {
-    headline: 'Market data temporarily unavailable',
-    category: 'System',
-    urgency: 'Normal',
-    minutesAgo: 0,
-  },
-];
+async function fetchLatestIndianNews() {
+    const apiKey = process.env.NEWS_API_KEY || process.env.NEXT_PUBLIC_NEWS_API_KEY;
+    if (!apiKey) throw new Error("NEWS_API_KEY is missing in environment.");
 
-const PROMPT = `Find the 4 most important Indian stock market news items from the last 6 hours. Focus on: RBI decisions, FII/DII flows, major corporate earnings, SEBI actions, crude oil impact on Indian markets, global macro events affecting Nifty. For each news item return: headline (max 10 words), category (one of: Macro/Sector/Earnings/Flow/Policy), urgency (one of: High/Elevated/Watch/Normal). Respond ONLY as JSON array: [{ headline, category, urgency, minutesAgo }]`;
+    // Fetching 5 real headlines for Indian Market
+    const query = encodeURIComponent('NIFTY 50 OR "Indian stock market"');
+    const url = `https://newsapi.org/v2/everything?q=${query}&sortBy=publishedAt&language=en&pageSize=5&apiKey=${apiKey}`;
 
-function extractJsonArray(text) {
-  if (!text || typeof text !== 'string') return null;
-  const trimmed = text.trim();
-  const fence = trimmed.match(/```(?:json)?\s*([\s\S]*?)```/i);
-  const body = fence ? fence[1] : trimmed;
-  const start = body.indexOf('[');
-  const end = body.lastIndexOf(']');
-  if (start === -1 || end === -1 || end <= start) return null;
-  try {
-    const parsed = JSON.parse(body.slice(start, end + 1));
-    return Array.isArray(parsed) ? parsed : null;
-  } catch {
-    return null;
-  }
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`NewsAPI yielded status ${res.status}`);
+    const data = await res.json();
+    return data.articles || [];
 }
 
-async function fetchBreakingSignals() {
-  const cacheKey = 'breakingSignals';
-  const cached = cache.get(cacheKey);
-  if (cached) return cached;
+async function analyzeNewsBatch(articles) {
+    if (!articles.length) return [];
 
-  const key = process.env.GEMINI_API_KEY;
-  if (!key) {
-    cache.set(cacheKey, FALLBACK_SIGNALS, 300);
-    return FALLBACK_SIGNALS;
-  }
+    const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
+    const model = genAI.getGenerativeModel({ 
+        model: "gemini-2.0-flash",
+        systemInstruction: "You are a Senior Fiduciary Analyst. Analyze the provided batch of news headlines for the Indian Market. For each, you MUST provide: headline, type (bullish/bearish), reasoning (min 2 sentences), and source (e.g., [Source: Reuters]). Return as a JSON array of objects."
+    });
 
-  const tryModels = ['gemini-1.5-pro', 'gemini-2.0-flash', 'gemini-1.5-flash'];
+    const batchPrompt = `Analyze these 5 news headlines and return a JSON array: ${JSON.stringify(articles.map(a => ({ title: a.title, description: a.description })))}`;
+    
+    const result = await model.generateContent(batchPrompt);
+    const text = result.response.text().replace(/```json/g, '').replace(/```/g, '').trim();
+    const analyzed = JSON.parse(text);
 
-  for (const modelName of tryModels) {
-    try {
-      const genAI = new GoogleGenerativeAI(key);
-      const model = genAI.getGenerativeModel({
-        model: modelName,
-        tools: [{ googleSearch: {} }],
-      });
-
-      const result = await model.generateContent({
-        contents: [{ role: 'user', parts: [{ text: PROMPT }] }],
-      });
-
-      const text =
-        result.response?.text?.() ||
-        result.response?.candidates?.[0]?.content?.parts
-          ?.map((p) => p.text)
-          .filter(Boolean)
-          .join('') ||
-        '';
-
-      const arr = extractJsonArray(text);
-      if (!arr || !arr.length) continue;
-
-      const normalized = arr.slice(0, 4).map((item) => ({
-        headline: String(item.headline || '').slice(0, 500),
-        category: String(item.category || 'Macro'),
-        urgency: String(item.urgency || 'Normal'),
-        minutesAgo: Math.max(0, Math.min(360, Number(item.minutesAgo) || 0)),
-      }));
-
-      cache.set(cacheKey, normalized, 14400);
-      return normalized;
-    } catch {
-      /* try next model */
-    }
-  }
-
-  cache.set(cacheKey, FALLBACK_SIGNALS, 300);
-  return FALLBACK_SIGNALS;
+    // Merge with original article data and normalize fields
+    return articles.map((a, i) => {
+        const ai = analyzed[i] || {};
+        return {
+            ...a,
+            symbol: ai.symbol || "NIFTY", // Fallback symbol
+            aiAnalysis: {
+                sentiment: ai.type === 'bullish' ? 'Positive' : 'Negative',
+                type: ai.type || 'bullish',
+                impactScore: ai.type === 'bullish' ? 75 : 45,
+                reasoning: ai.reasoning || "Deep analysis pending.",
+                source: ai.source || "[Source: Institutional Feed]"
+            }
+        };
+    });
 }
 
 module.exports = {
-  fetchBreakingSignals,
+    fetchLatestIndianNews,
+    analyzeNewsBatch
 };

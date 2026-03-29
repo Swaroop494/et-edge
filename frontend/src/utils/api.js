@@ -1,8 +1,10 @@
-// ET Edge — Frontend API utility. Import these functions to call the backend.
+// ET Edge — Frontend API utility.
+// Updated to use the core hybrid fetch logic from @/lib/api for "zero-failure" behavior.
 
 import { auth } from "../lib/firebase";
+import { apiFetch, apiPost } from "../lib/api";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:5001/api";
+const API_BASE = "http://localhost:5500/api";
 
 async function getAuthHeaders(customHeaders = {}) {
   const headers = { "Content-Type": "application/json", ...customHeaders };
@@ -18,194 +20,50 @@ async function getAuthHeaders(customHeaders = {}) {
 }
 
 export async function fetchLiveNews() {
-  try {
-    const headers = await getAuthHeaders();
-    const response = await fetch(`${API_BASE}/live-news`, { headers });
-    if (!response.ok) throw new Error("Failed to fetch live news");
-    return await response.json();
-  } catch (error) {
-    console.error("fetchLiveNews error:", error);
-    return [];
-  }
+  const data = await apiFetch("/api/live-news");
+  return data || [];
 }
 
 export async function analyzeEvent(headline, summary) {
-  try {
-    const headers = await getAuthHeaders();
-    const response = await fetch(`${API_BASE}/analyze-event`, {
-      method: "POST",
-      headers,
-      body: JSON.stringify({ headline, summary }),
-    });
-    return await response.json();
-  } catch (error) {
-    console.error("analyzeEvent error:", error);
-    return null;
-  }
+  return await apiPost("/api/analyze-event", { headline, summary });
 }
 
 export async function validateTip(tipText, newsContext) {
-  try {
-    const headers = await getAuthHeaders();
-    const response = await fetch(`${API_BASE}/validate-tip`, {
-      method: "POST",
-      headers,
-      body: JSON.stringify({ tipText, newsContext }),
-    });
-    const contentType = response.headers.get("content-type") || "";
-    if (!response.ok) {
-      const text = await response.text().catch(() => "");
-      throw new Error(`validateTip failed (${response.status}): ${text || response.statusText}`);
-    }
-    if (!contentType.includes("application/json")) {
-      const text = await response.text().catch(() => "");
-      throw new Error(`validateTip returned non-JSON: ${text.slice(0, 120)}`);
-    }
-    return await response.json();
-  } catch (error) {
-    console.error("validateTip error:", error);
-    throw error;
-  }
+  return await apiPost("/api/validate-tip", { tipText, newsContext });
 }
 
 export async function runWhatIfScenario(scenarioText) {
-  const headers = await getAuthHeaders();
-  const response = await fetch(`${API_BASE}/what-if`, {
-    method: "POST",
-    headers,
-    body: JSON.stringify({ scenarioText }),
-  });
-  const contentType = response.headers.get("content-type") || "";
-  if (!response.ok) {
-    const text = await response.text().catch(() => "");
-    throw new Error(`whatIf failed (${response.status}): ${text || response.statusText}`);
-  }
-  if (!contentType.includes("application/json")) {
-    const text = await response.text().catch(() => "");
-    throw new Error(`whatIf returned non-JSON: ${text.slice(0, 120)}`);
-  }
-  return await response.json();
+  return await apiPost("/api/what-if", { scenarioText });
 }
 
 export async function portfolioImpact(userHoldings, eventAnalysis) {
-  try {
-    const headers = await getAuthHeaders();
-    const response = await fetch(`${API_BASE}/portfolio-impact`, {
-      method: "POST",
-      headers,
-      body: JSON.stringify({ userHoldings, eventAnalysis }),
-    });
-    return await response.json();
-  } catch (error) {
-    console.error("portfolioImpact error:", error);
-    return null;
-  }
+  return await apiPost("/api/portfolio-impact", { userHoldings, eventAnalysis });
 }
 
 export async function runAgent(userHoldings, tip) {
-  try {
-    const response = await fetch(`${API_BASE}/agent/run`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ userHoldings: userHoldings || [], tip: tip || "" }),
-    });
-    return await response.json();
-  } catch (error) {
-    console.error("runAgent error:", error);
-    return null;
-  }
+  return await apiPost("/api/agent/run", { userHoldings: userHoldings || [], tip: tip || "" });
 }
 
 export async function runBulkDealAgent(filing) {
-  try {
-    const headers = await getAuthHeaders();
-    const response = await fetch(`${API_BASE}/agent/bulk-deal`, {
-      method: "POST",
-      headers,
-      body: JSON.stringify({ filing }),
-    });
-    return await response.json();
-  } catch (error) {
-    console.error("runBulkDealAgent error:", error);
-    return null;
-  }
+  return await apiPost("/api/agent/bulk-deal", { filing });
 }
 
 export async function runTechnicalAgent(signal) {
-  try {
-    const headers = await getAuthHeaders();
-    const response = await fetch(`${API_BASE}/agent/technical`, {
-      method: "POST",
-      headers,
-      body: JSON.stringify({ signal }),
-    });
-    return await response.json();
-  } catch (error) {
-    console.error("runTechnicalAgent error:", error);
-    return null;
-  }
+  return await apiPost("/api/agent/technical", { signal });
 }
 
 export async function runPortfolioNewsAgent(portfolio, events) {
-  try {
-    const headers = await getAuthHeaders();
-    const response = await fetch(`${API_BASE}/agent/portfolio-news`, {
-      method: "POST",
-      headers,
-      body: JSON.stringify({ portfolio, events }),
-    });
-    return await response.json();
-  } catch (error) {
-    console.error("runPortfolioNewsAgent error:", error);
-    return null;
-  }
+  return await apiPost("/api/agent/portfolio-news", { portfolio, events });
 }
+
 export async function runMarketGPT(query, userHoldings) {
-  try {
-    const headers = await getAuthHeaders();
-    const response = await fetch(`${API_BASE}/market-gpt`, {
-      method: "POST",
-      headers,
-      body: JSON.stringify({ query, userHoldings }),
-    });
-    return await response.json();
-  } catch (error) {
-    console.error("runMarketGPT error:", error);
-    return null;
-  }
+  return await apiPost("/api/market-gpt", { query, userHoldings });
 }
 
-/**
- * Trigger Agentic Scenario Generation for high-impact signals.
- */
 export async function generateScenarios() {
-  try {
-    const headers = await getAuthHeaders();
-    const response = await fetch(`${API_BASE}/scenarios/generate`, {
-      method: "POST",
-      headers
-    });
-    return await response.json();
-  } catch (err) {
-    console.error("generateScenarios error:", err.message);
-    return null;
-  }
+  return await apiPost("/api/scenarios/generate", {});
 }
 
-/**
- * Perform manual Audit (Track Actual) for the learning loop.
- */
 export async function auditScenario(logId, actualChange) {
-  try {
-    const headers = await getAuthHeaders();
-    const response = await fetch(`${API_BASE}/scenarios/audit`, {
-      method: "POST",
-      headers,
-      body: JSON.stringify({ logId, actualChange })
-    });
-    return await response.json();
-  } catch (err) {
-    console.error("auditScenario error:", err.message);
-    return null;
-  }
+  return await apiPost("/api/scenarios/audit", { logId, actualChange });
 }

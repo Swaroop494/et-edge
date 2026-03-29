@@ -1,24 +1,23 @@
 import { initializeApp, getApps, getApp } from "firebase/app";
 import { getAuth, setPersistence, browserLocalPersistence } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
+// Import the functions you need from the SDKs you need
+// TODO: Add SDKs for Firebase products that you want to use
+// https://firebase.google.com/docs/web/setup#available-libraries
 
+// Your web app's Firebase configuration
 const firebaseConfig = {
-  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
-  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
-  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
-  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
-  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID
+  apiKey: "AIzaSyAE3fvNricHRmtKqdN44gFrv3K-2n33jQ0",
+  authDomain: "et-edge-live.firebaseapp.com",
+  projectId: "et-edge-live",
+  storageBucket: "et-edge-live.firebasestorage.app",
+  messagingSenderId: "249074067977",
+  appId: "1:249074067977:web:72459017235009878526d8"
 };
 
+// Initialize Firebase
 const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
-const auth = getAuth(app);
-const db = getFirestore(app);
-
-// Keep users signed in across refreshes.
-setPersistence(auth, browserLocalPersistence).catch(() => {
-  // If persistence fails (e.g., blocked), auth will still function but may not persist.
-});
-
-export { app, auth, db };
-
+export const db = getFirestore(app);
+export const auth = getAuth(app);
+setPersistence(auth, browserLocalPersistence);
+export { app };

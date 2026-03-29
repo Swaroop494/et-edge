@@ -5,9 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { CheckCircle2, Circle, Loader2, AlertTriangle, TrendingUp, BarChart3 } from "lucide-react";
-import { apiFetch } from "@/lib/api";
-
-import { API_BASE } from "@/lib/api";
+import { apiFetch, apiPost } from "@/lib/api";
 
 const TABS = [
   { id: "bulk", label: "Bulk Deal Filing", icon: AlertTriangle, description: "Promoter sold 4.2% stake at 6% discount — distress or routine?" },
@@ -140,10 +138,12 @@ const PortfolioNewsResult = ({ data }: { data: any }) => {
   );
 };
 
+import { AgentResponse, MarketSignal } from "@/types/api";
+
 const SignalAgent = () => {
   const [activeTab, setActiveTab] = useState("bulk");
   const [isRunning, setIsRunning] = useState(false);
-  const [result, setResult] = useState<any | null>(null);
+  const [result, setResult] = useState<AgentResponse<any> | null>(null);
 
   const [error, setError] = useState<string | null>(null);
   const [verificationDepth, setVerificationDepth] = useState(1);
@@ -158,30 +158,22 @@ const SignalAgent = () => {
     fetchStats();
   }, []);
 
-  const endpointMap: Record<string, string> = {
-    bulk: `${API_BASE}/api/agent/bulk-deal`,
-    technical: `${API_BASE}/api/agent/technical`,
-    portfolio: `${API_BASE}/api/agent/portfolio-news`,
-  };
+
 
   const handleRun = async () => {
     setIsRunning(true);
     setResult(null);
     setError(null);
-    try {
-      const res = await fetch(endpointMap[activeTab], {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ verificationDepth }),
-      });
-      const data = await res.json();
+    const endpoint = activeTab === "bulk" ? "/api/agent/bulk-deal" : activeTab === "technical" ? "/api/agent/technical" : "/api/agent/portfolio-news";
+    const data = await apiPost<any>(endpoint, { verificationDepth });
+    if (data) {
       if (!data.success) {
         setError(data.error ?? "Agent failed");
       } else {
         setResult(data);
       }
-    } catch (e: any) {
-      setError(e.message);
+    } else {
+      setError("Agent is currently in calibration. Please try again or check mock stats.");
     }
     setIsRunning(false);
   };

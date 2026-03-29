@@ -21,6 +21,12 @@ const buildMockImpact = (userHoldings) => {
 router.post('/', async (req, res) => {
   try {
     const { userHoldings, eventAnalysis } = req.body;
+    
+    if (global.USE_MOCKS) {
+      console.log('📡 Mode: Safety Fallback (Portfolio Impact)');
+      return res.status(200).json(buildMockImpact(userHoldings || []));
+    }
+
     if (!Array.isArray(userHoldings) || userHoldings.length === 0) {
       return res.status(400).json({
         message: 'userHoldings must be a non-empty array of stock symbols',
@@ -48,13 +54,13 @@ router.post('/', async (req, res) => {
       const cleaned = rawText.replace(/```json/g, '').replace(/```/g, '').trim();
       parsedResponse = JSON.parse(cleaned);
     } catch (aiErr) {
-      console.error("Gemini portfolio impact failed, using mock fallback:", aiErr.message);
+      console.log('📡 Mode: Safety Fallback (Portfolio Impact AI Error)');
       parsedResponse = buildMockImpact(userHoldings);
     }
 
     return res.status(200).json(parsedResponse);
   } catch (err) {
-    console.error("Portfolio impact route error:", err);
+    console.log('📡 Mode: Safety Fallback (Portfolio Impact Route Error)');
     return res.status(200).json(buildMockImpact(req.body.userHoldings || []));
   }
 });

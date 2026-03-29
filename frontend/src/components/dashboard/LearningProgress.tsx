@@ -2,15 +2,21 @@
 
 import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { API_BASE, apiFetch } from "@/lib/api";
+import { apiFetch } from "@/lib/api";
 import { BrainCircuit, Zap, CheckCircle2, TrendingUp, Info } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
-
-// Mock fallback values — shown when API is unreachable
-const MOCK_STATS = { accuracy: 76, totalLogs: 0, latestLesson: "Calibrating real-time accuracy...", isImproving: false };
+import { LearningStats } from "@/types/api";
 
 const LearningProgress = () => {
-  const [stats, setStats] = useState(MOCK_STATS);
+  const [stats, setStats] = useState<LearningStats>({
+    accuracy: 76,
+    samples: 0,
+    lastUpdate: new Date().toISOString(),
+    errorMargin: 0,
+    isImproving: true,
+    totalLogs: 0,
+    latestLesson: "Initializing neural core calibration..."
+  });
   const [isLoading, setIsLoading] = useState(true);
   const [usingFallback, setUsingFallback] = useState(false);
 
@@ -60,7 +66,7 @@ const LearningProgress = () => {
             {stats.accuracy}%
           </span>
           <div className="flex items-center gap-1 justify-end text-[9px] text-accent">
-            <TrendingUp size={10} /> {stats.totalLogs} logs
+            <TrendingUp size={10} /> {stats.samples} samples
           </div>
           {usingFallback && (
             <p className="text-[9px] text-warning/70 mt-0.5">demo data</p>
